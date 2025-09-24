@@ -7,35 +7,30 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <div class="chip">👨‍🎓 <span id="userChip">未登入</span></div>
-    <div class="chip">分數 <b id="score">0</b></div>
-    <div class="chip">時間 <b id="time">60</b>s</div>
-    <div class="chip">最佳 <b id="best">0</b></div>
-    <button id="btnStart" class="chip" style="cursor:pointer">▶️ 開始 / 暫停</button>
-    <button id="btnLeader" class="chip" style="cursor:pointer">🏆 排行</button>
-    <button id="btnTeacher" class="chip" style="cursor:pointer">🧑‍🏫 教師</button>
-    <button id="btnKbdSize" class="chip" style="cursor:pointer">⌨️ 縮小鍵盤</button>
-    <span class="chip legend"><span class="dot sm"></span>聲母</span>
-    <span class="chip legend"><span class="dot md"></span>介音</span>
-    <span class="chip legend"><span class="dot ym"></span>韻母</span>
-  </header>
+<header>
+  <div class="chip">👨‍🎓 <span id="userChip">未登入</span></div>
+  <div class="chip">分數 <b id="score">0</b></div>
+  <div class="chip">時間 <b id="time">60</b>s</div>
+  <button id="btnStart" class="chip" style="cursor:pointer">▶️ 開始 / 暫停</button>
+  <div class="chip" id="chipHint">
+    提示：點擊注音鍵擊落相同符號的隕石。    
+  </div>
+</header>
+
+
   <div id="gameWrap">
     <canvas id="gameCanvas" width="1280" height="720"></canvas>
-    <div class="panel" id="panelHint">
-      <h3>提示</h3>
-      <div>請點擊下方<strong>注音鍵</strong>擊落帶有相同符號的隕石。</div>
-      <div style="margin-top:6px;font-size:12px;opacity:.8">✅ 正確 +1｜❌ 錯誤 -1（不低於0）</div>
-    </div>
     <div id="leader" hidden>
-      <table>
-        <thead><tr><th>#</th><th>學號</th><th>最佳</th></tr></thead>
-        <tbody id="leaderBody"></tbody>
-      </table>
-      <div style="margin-top:8px;display:flex;gap:6px">
-        <button id="btnCloseLeader" class="tag">關閉</button>
-      </div>
-    </div>
+  <table>
+    <thead><tr><th>#</th><th>學號</th><th>最佳</th></tr></thead>
+    <tbody id="leaderBody"></tbody>
+  </table>
+  <div style="margin-top:8px;display:flex;gap:6px">
+    <button id="btnRestartGame" class="tag">重新開始</button>
+    <button id="btnCloseLeader" class="tag">關閉</button>
+  </div>
+</div>
+
   </div>
 
   <div id="kbd"></div>
@@ -56,29 +51,27 @@
   </div>
 
   <!-- Login / teacher modal -->
-  <div id="login">
-    <div id="card">
-      <h2 style="margin:0 0 8px">登入遊戲</h2>
-      <p style="opacity:.85;margin:.2rem 0 .8rem">請輸入 <b>學號（5位數）</b> 與姓名（選填）。</p>
-      <label>學號</label>
-      <input id="sid" placeholder="例如：03125" inputmode="numeric" maxlength="5" />
-      <label>姓名（選填）</label>
-      <input id="sname" placeholder="王小明" />
+<div id="login">
+  <div id="card">
+    <h2 style="margin:0 0 8px">登入遊戲</h2>
+    <p style="opacity:.85;margin:.2rem 0 .8rem">請輸入 <b>學號（5位數）</b>。</p>
+    <label>學號</label>
+    <input id="sid" placeholder="例如：30130" inputmode="numeric" maxlength="5" />
+    <div class="rowBtns">
+      <button id="go" class="primary">登入</button>
+      <button id="teacherOpen" class="ghost">教師後台</button>
+    </div>
+    <div id="teacherPane" style="display:none;margin-top:14px;padding:10px;border:1px dashed rgba(255,255,255,.35);border-radius:12px">
+      <label>教師密碼</label>
+      <input id="tpass" placeholder="輸入後台密碼" />
       <div class="rowBtns">
-        <button id="go" class="primary">登入</button>
-        <button id="teacherOpen" class="ghost">教師後台</button>
+        <button id="enterTeacher" class="primary">進入教師後台</button>
+        <button id="clearLocal" class="ghost">清除本機紀錄</button>
       </div>
-      <div id="teacherPane" style="display:none;margin-top:14px;padding:10px;border:1px dashed rgba(255,255,255,.35);border-radius:12px">
-        <label>教師密碼</label>
-        <input id="tpass" placeholder="輸入後台密碼" />
-        <div class="rowBtns">
-          <button id="enterTeacher" class="primary">進入教師後台</button>
-          <button id="clearLocal" class="ghost">清除本機紀錄</button>
-        </div>
-        <small style="opacity:.7">⚠️ 目前為本機版（MVP）。正式版可串接雲端資料庫共用排行。</small>
-      </div>
+      <small style="opacity:.7">⚠️ 目前為本機版（MVP）。正式版可串接雲端資料庫共用排行。</small>
     </div>
   </div>
+</div>
 
   <div class="toast" id="toast"></div>
 
