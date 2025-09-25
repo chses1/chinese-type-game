@@ -1,97 +1,131 @@
-// 可選：本機才載入 dotenv，雲端沒有也不會掛
+// server.js
+import express from "express";
+import cors from "cors";
+import { MongoClient } from "mongodb";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// === 路徑處理 ===
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// === dotenv (可選載入) ===
 if (!process.env.MONGODB_URI) {
   try {
-    const { config } = await import('dotenv');
-    config(); // 讀取 .env，填到 process.env
-    console.log('[dotenv] loaded .env for local dev');
-  } catch (e) {
-    console.warn('[dotenv] not installed; skipping');
+    const { config } = await import("dotenv");
+    config();
+    console.log("[dotenv] loaded .env for local dev");
+  } catch {
+    console.log("[dotenv] not installed; skip");
   }
 }
 
-import 'dotenv/config';
-import express from 'express';
-import mongoose from 'mongoose';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
-
 const app = express();
 app.use(express.json());
-app.use(helmet());
-app.use(compression());
-app.use(morgan('tiny'));
 
-const ORIGIN = process.env.CORS_ORIGIN || '*';
-app.use(cors({ origin: ORIGIN }));
-
-// 基本限流，避免暴力灌分
-app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, limit: 600 }));
-
-// Mongo 連線
-const MONGODB_URI = process.env.MONGODB_URI;
-if (!MONGODB_URI) {
-  console.error('Missing MONGODB_URI');
-  process.exit(1);
+// === CORS (若前後端不同源才要) ===
+if (process.env.CORS_ORIGIN) {
+  app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
 }
-await mongoose.connect(MONGODB_URI, { dbName: process.env.DB_NAME || 'zhuyin' });
 
-// Schema：用 sid（五碼座號）做唯一索引，best 存最佳分數
-const scoreSchema = new mongoose.Schema({
-  sid: { type: String, required: true, index: true, unique: true },
-  name: { type: String, default: '' },
-  best: { type: Number, default: 0 }
-}, { timestamps: true });
+// === 健康檢查 ===
+app.get("/healthz", (req, res) => res.send("ok"));
 
-const Score = mongoose.model('scores', scoreSchema);
+// === 提供靜態檔案 (index.html, main.js, style.css, 圖片) ===
+app.use(express.static(__dirname));
 
-// 健康檢查
-app.get('/healthz', (req, res) => res.send('ok'));
+// === MongoDB 連線 ===
+const mongoUri = process.env.MONGODB_URI;
+const dbName = process.env.DB_NAME || "zhuyin";
+let client, db, students;
 
-// Upsert 學生（登入時建立/更新名稱，可選）
-app.post('/api/upsert-student', async (req, res) => {
+async function initMongo() {
+  if (!mongoUri) {
+    console.warn("[mongo] MONGODB_URI not set; API will return 503");
+    return;
+  }
   try {
-    const { sid, name = '' } = req.body || {};
-    if (!/^\d{5}$/.test(sid)) return res.status(400).json({ error: 'sid invalid' });
-    const doc = await Score.findOneAndUpdate(
-      { sid },
-      { $setOnInsert: { sid }, $set: { name } },
-      { new: true, upsert: true }
-    );
-    res.json({ ok: true, data: { sid: doc.sid, name: doc.name, best: doc.best } });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    client = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 8000 });
+    await client.connect();
+    db = client.db(dbName);
+    students = db.collection("students");
+    console.log("[mongo] connected:", dbName);
+  } catch (err) {
+    console.error("[mongo] connect failed:", err.message);
+  }
+}
+await initMongo();
+
+function requireDB(res) {
+  if (!students) {
+    res.status(503).json({ ok: false, error: "db_unavailable" });
+    return false;
+  }
+  return true;
+}
+
+// === API: 建立/更新學生 ===
+app.post("/api/upsert-student", async (req, res) => {
+  if (!requireDB(res)) return;
+  const { sid, name = "" } = req.body || {};
+  if (!/^\d{5}$/.test(String(sid))) {
+    return res.status(400).json({ ok: false, error: "sid_invalid" });
+  }
+  const now = new Date();
+  await students.updateOne(
+    { sid: String(sid) },
+    { $setOnInsert: { best: 0, createdAt: now }, $set: { name, updatedAt: now } },
+    { upsert: true }
+  );
+  const doc = await students.findOne({ sid: String(sid) });
+  res.json({ ok: true, data: { sid: doc.sid, name: doc.name, best: doc.best } });
 });
 
-// 更新最佳（僅提升不下降）
-app.post('/api/update-best', async (req, res) => {
-  try {
-    const { sid, score } = req.body || {};
-    if (!/^\d{5}$/.test(sid)) return res.status(400).json({ error: 'sid invalid' });
-    if (!Number.isFinite(score)) return res.status(400).json({ error: 'score invalid' });
-
-    const doc = await Score.findOneAndUpdate(
-      { sid, best: { $lt: score } },
-      { $set: { best: score } },
-      { new: true }
-    );
-
-    // 若沒有更好成績，就回傳現況
-    const finalDoc = doc || await Score.findOne({ sid });
-    res.json({ ok: true, data: { sid: finalDoc.sid, name: finalDoc.name, best: finalDoc.best } });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+// === API: 更新最佳分數 ===
+app.post("/api/update-best", async (req, res) => {
+  if (!requireDB(res)) return;
+  const { sid, score } = req.body || {};
+  if (!/^\d{5}$/.test(String(sid)) || typeof score !== "number") {
+    return res.status(400).json({ ok: false, error: "bad_request" });
+  }
+  const doc = await students.findOne({ sid: String(sid) });
+  const best = Math.max(Number(doc?.best || 0), score);
+  await students.updateOne(
+    { sid: String(sid) },
+    { $set: { best, updatedAt: new Date() } }
+  );
+  res.json({ ok: true, data: { sid: String(sid), best } });
 });
 
-// 排行榜（預設前 20）
-app.get('/api/leaderboard', async (req, res) => {
-  try {
-    const limit = Math.min(Number(req.query.limit) || 20, 100);
-    const rows = await Score.find({}, { _id: 0, __v: 0 })
-      .sort({ best: -1, updatedAt: 1 }).limit(limit).lean();
-    res.json({ ok: true, data: rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+// === API: 排行榜 ===
+app.get("/api/leaderboard", async (req, res) => {
+  if (!requireDB(res)) return;
+  const limit = Math.min(Number(req.query.limit || 10), 100);
+  const list = await students
+    .find({}, { projection: { _id: 0, sid: 1, name: 1, best: 1 } })
+    .sort({ best: -1, updatedAt: -1 })
+    .limit(limit)
+    .toArray();
+  res.json({ ok: true, data: list });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`API on :${PORT}`));
+// === API: 查詢單一學生 best ===
+app.get("/api/student/:sid", async (req, res) => {
+  if (!requireDB(res)) return;
+  const sid = req.params.sid;
+  if (!/^\d{5}$/.test(sid)) {
+    return res.status(400).json({ ok: false, error: "sid_invalid" });
+  }
+  const doc = await students.findOne({ sid });
+  if (!doc) return res.json({ ok: true, data: { sid, best: 0 } });
+  res.json({ ok: true, data: { sid: doc.sid, best: doc.best } });
+});
+
+// === SPA 路由處理 ===
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+// === 啟動伺服器 ===
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Server listening on :${port}`));
