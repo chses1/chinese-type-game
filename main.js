@@ -1,3 +1,10 @@
+// --- hotfix: 防止未宣告的 db 造成載入崩潰 ---
+const db = { students: {} };
+function saveDB() {}
+function setBest() {
+  // 目前畫面沒有 #best 元素；若未來需要，這裡可根據 API 回傳填入
+}
+
 /* === Cloud DB via API === */
 const API_BASE = 'https://di-qiu-bao-wei-zhan.onrender.com'; // 例如 https://zhuyin-api.onrender.com
 

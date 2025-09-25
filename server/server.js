@@ -1,3 +1,14 @@
+// 可選：本機才載入 dotenv，雲端沒有也不會掛
+if (!process.env.MONGODB_URI) {
+  try {
+    const { config } = await import('dotenv');
+    config(); // 讀取 .env，填到 process.env
+    console.log('[dotenv] loaded .env for local dev');
+  } catch (e) {
+    console.warn('[dotenv] not installed; skipping');
+  }
+}
+
 import 'dotenv/config';
 import express from 'express';
 import mongoose from 'mongoose';
