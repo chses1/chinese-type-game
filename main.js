@@ -1,5 +1,5 @@
 /* === Cloud DB via API === */
-const API_BASE = 'https://<你的-render-網域>'; // 例如 https://zhuyin-api.onrender.com
+const API_BASE = 'https://di-qiu-bao-wei-zhan.onrender.com'; // 例如 https://zhuyin-api.onrender.com
 
 async function api(path, opts = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
