@@ -185,7 +185,7 @@ function closeLeader(){ document.getElementById('leader').hidden=true; }
 
 /* === Login/Teacher === */
 function openTeacherPane(){ const p=document.getElementById('teacherPane'); if(p) p.style.display='block'; }
-function enterTeacher(){ const pass=document.getElementById('tpass').value.trim(); if(pass!=='teacher123'){ alert('密碼錯誤（測試用：teacher123）'); return;} document.getElementById('login').style.display='none'; openLeader(); }
+function enterTeacher(){ const pass=document.getElementById('tpass').value.trim(); if(pass!=='1070'){ alert('密碼錯誤'); return;} document.getElementById('login').style.display='none'; openLeader(); }
 
 /* === Events === */
 const $ = id => document.getElementById(id);
@@ -206,7 +206,6 @@ if($('go')) $('go').onclick=()=>{
 
 if($('teacherOpen')) $('teacherOpen').onclick=openTeacherPane;
 if($('enterTeacher')) $('enterTeacher').onclick=enterTeacher;
-if($('clearLocal')) $('clearLocal').onclick=()=>{ if(confirm('確定清除本機全部成績？')){ clearAll(); alert('已清除。'); } };
 
 /* === Physical keyboard === */
 addEventListener('keydown',e=>{ if(e.key===' '){ e.preventDefault(); toggleRun(); return;} if(e.key==='Escape'){ pauseGame(); return;} if(ZHUYIN.includes(e.key)){ pressKey(e.key); } });
