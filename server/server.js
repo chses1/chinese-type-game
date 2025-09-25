@@ -5,12 +5,12 @@ import { MongoClient } from "mongodb";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// === 路徑設定：server 在 /server，前端檔案在專案根目錄 ===
+// === 路徑 ===
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT_DIR   = path.join(__dirname, ".."); // <-- 重要：指向專案根目錄
+const ROOT_DIR   = path.join(__dirname, "..");
 
-// === 本機可選載入 .env（Render 不需要安裝 dotenv 也不會炸） ===
+// === 環境變數（本機可用 .env）===
 if (!process.env.MONGODB_URI) {
   try {
     const { config } = await import("dotenv");
@@ -23,8 +23,6 @@ if (!process.env.MONGODB_URI) {
 
 const app = express();
 app.use(express.json());
-
-// 只有前後端不同網域時才需要 CORS
 if (process.env.CORS_ORIGIN) {
   app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
 }
@@ -32,10 +30,10 @@ if (process.env.CORS_ORIGIN) {
 // 健康檢查
 app.get("/healthz", (req, res) => res.send("ok"));
 
-// 提供前端靜態檔案（index.html / main.js / style.css / img/*）
+// 前端靜態檔案
 app.use(express.static(ROOT_DIR));
 
-// === MongoDB 連線 ===
+// === MongoDB ===
 const mongoUri = process.env.MONGODB_URI;
 const dbName   = process.env.DB_NAME || "zhuyin";
 
@@ -51,6 +49,8 @@ async function initMongo() {
     await client.connect();
     db       = client.db(dbName);
     students = db.collection("students");
+    await students.createIndex({ sid: 1 }, { unique: true });
+    await students.createIndex({ best: -1, updatedAt: -1 });
     console.log("[mongo] connected:", dbName);
   } catch (err) {
     console.error("[mongo] connect failed:", err.message);
@@ -66,24 +66,21 @@ function requireDB(res) {
   return true;
 }
 
-// === API: 建立/更新學生 ===
+// === 一般 API ===
 app.post("/api/upsert-student", async (req, res) => {
   if (!requireDB(res)) return;
   const { sid, name = "" } = req.body || {};
-  if (!/^\d{5}$/.test(String(sid))) {
-    return res.status(400).json({ ok: false, error: "sid_invalid" });
-  }
+  if (!/^\d{5}$/.test(String(sid))) return res.status(400).json({ ok: false, error: "sid_invalid" });
   const now = new Date();
   await students.updateOne(
     { sid: String(sid) },
     { $setOnInsert: { best: 0, createdAt: now }, $set: { name, updatedAt: now } },
     { upsert: true }
   );
-  const doc = await students.findOne({ sid: String(sid) });
-  res.json({ ok: true, data: { sid: doc.sid, name: doc.name, best: doc.best } });
+  const doc = await students.findOne({ sid: String(sid) }, { projection: { _id: 0, sid: 1, name: 1, best: 1 } });
+  res.json({ ok: true, data: doc });
 });
 
-// === API: 更新最佳分數 ===
 app.post("/api/update-best", async (req, res) => {
   if (!requireDB(res)) return;
   const { sid, score } = req.body || {};
@@ -99,39 +96,79 @@ app.post("/api/update-best", async (req, res) => {
   res.json({ ok: true, data: { sid: String(sid), best } });
 });
 
-// === API: 排行榜 ===
+// 支援班級過濾：/api/leaderboard?limit=20&classPrefix=301   // NEW
 app.get("/api/leaderboard", async (req, res) => {
   if (!requireDB(res)) return;
   const limit = Math.min(Number(req.query.limit || 10), 100);
+  const classPrefix = (req.query.classPrefix || "").trim();
+  const filter = {};
+  if (/^\d{3}$/.test(classPrefix)) filter.sid = new RegExp("^" + classPrefix);
+
   const list  = await students
-    .find({}, { projection: { _id: 0, sid: 1, name: 1, best: 1 } })
+    .find(filter, { projection: { _id: 0, sid: 1, name: 1, best: 1 } })
     .sort({ best: -1, updatedAt: -1 })
     .limit(limit)
     .toArray();
   res.json({ ok: true, data: list });
 });
 
-// === API: 查單一學生 ===
 app.get("/api/student/:sid", async (req, res) => {
   if (!requireDB(res)) return;
   const sid = req.params.sid;
-  if (!/^\d{5}$/.test(sid)) {
-    return res.status(400).json({ ok: false, error: "sid_invalid" });
-  }
-  const doc = await students.findOne({ sid });
+  if (!/^\d{5}$/.test(sid)) return res.status(400).json({ ok: false, error: "sid_invalid" });
+  const doc = await students.findOne({ sid }, { projection: { _id: 0, sid: 1, best: 1 } });
   res.json({ ok: true, data: { sid, best: Number(doc?.best || 0) } });
 });
 
-// === API 未命中時回 404（避免被 SPA fallback 吃掉） ===
-app.use("/api", (req, res) => {
-  res.status(404).json({ ok: false, error: "not_found" });
+// 取得現有班級清單與統計（依前三碼分組） // NEW
+app.get("/api/classes", async (req, res) => {
+  if (!requireDB(res)) return;
+  const pipeline = [
+    { $project: { _id: 0, sid: 1, best: 1, class: { $substr: ["$sid", 0, 3] } } },
+    { $group: { _id: "$class", count: { $sum: 1 }, top: { $max: "$best" }, avg: { $avg: "$best" } } },
+    { $project: { class: "$_id", _id: 0, count: 1, top: 1, avg: { $round: ["$avg", 1] } } },
+    { $sort: { class: 1 } }
+  ];
+  const data = await students.aggregate(pipeline).toArray();
+  res.json({ ok: true, data });
 });
 
-// === SPA fallback：只處理非 /api/* 路徑 ===
-app.get(/^\/(?!api\/).*/, (req, res) => {
+// === 教師權限 ===
+const TEACHER_TOKEN = process.env.TEACHER_TOKEN || "1070"; // CHG: 可改環境變數
+function adminAuth(req, res, next) {
+  const token = req.header("x-teacher-token") || req.query.token;
+  if (token !== TEACHER_TOKEN) return res.status(401).json({ ok: false, error: "unauthorized" });
+  next();
+}
+
+// 重設某班級（前三碼）best 為 0   // NEW
+app.post("/api/admin/clear-class", adminAuth, async (req, res) => {
+  if (!requireDB(res)) return;
+  const { classPrefix } = req.body || {};
+  if (!/^\d{3}$/.test(String(classPrefix))) {
+    return res.status(400).json({ ok: false, error: "class_prefix_invalid" });
+  }
+  const r = await students.updateMany(
+    { sid: new RegExp("^" + classPrefix) },
+    { $set: { best: 0, updatedAt: new Date() } }
+  );
+  res.json({ ok: true, data: { matched: r.matchedCount, modified: r.modifiedCount } });
+});
+
+// 清空全部 best（保留學生，但將 best 歸零） // NEW
+app.post("/api/admin/clear-all", adminAuth, async (_req, res) => {
+  if (!requireDB(res)) return;
+  const r = await students.updateMany({}, { $set: { best: 0, updatedAt: new Date() } });
+  res.json({ ok: true, data: { matched: r.matchedCount, modified: r.modifiedCount } });
+});
+
+// API 404
+app.use("/api", (req, res) => res.status(404).json({ ok: false, error: "not_found" }));
+
+// SPA fallback
+app.get(/^\/(?!api\/).*/, (_req, res) => {
   res.sendFile(path.join(ROOT_DIR, "index.html"));
 });
 
-// === 啟動 ===
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server listening on :${port}`));

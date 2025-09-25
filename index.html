@@ -17,40 +17,40 @@
   </div>
 </header>
 
+<div id="gameWrap">
+  <canvas id="gameCanvas" width="1280" height="720"></canvas>
 
-  <div id="gameWrap">
-    <canvas id="gameCanvas" width="1280" height="720"></canvas>
-    <div id="leader" hidden>
-  <table>
-    <thead><tr><th>#</th><th>學號</th><th>最佳</th></tr></thead>
-    <tbody id="leaderBody"></tbody>
-  </table>
-  <div style="margin-top:8px;display:flex;gap:6px">
-    <button id="btnRestartGame" class="tag">重新開始</button>
-    <button id="btnCloseLeader" class="tag">關閉</button>
+  <!-- 遊戲結束排行榜（保留） -->
+  <div id="leader" hidden>
+    <table>
+      <thead><tr><th>#</th><th>學號</th><th>最佳</th></tr></thead>
+      <tbody id="leaderBody"></tbody>
+    </table>
+    <div style="margin-top:8px;display:flex;gap:6px">
+      <button id="btnRestartGame" class="tag">重新開始</button>
+      <button id="btnCloseLeader" class="tag">關閉</button>
+    </div>
   </div>
 </div>
 
+<div id="kbd"></div>
+
+<!-- Result Modal -->
+<div id="resultBox">
+  <div id="resultCard">
+    <h2>打字結果</h2>
+    <table>
+      <tr><td class="good">打對：</td><td id="resCorrect">0</td><td>字</td></tr>
+      <tr><td class="bad">打錯：</td><td id="resWrong">0</td><td>字</td></tr>
+      <tr><td>正確率：</td><td id="resAcc">0%</td><td></td></tr>
+      <tr><td>速度：</td><td id="resSpeed">0</td><td>字/分</td></tr>
+      <tr><td>升級資格：</td><td id="resPromo">—</td><td>(門檻 80%)</td></tr>
+    </table>
+    <button onclick="restart()" class="primary">再玩一次</button>
   </div>
+</div>
 
-  <div id="kbd"></div>
-
-  <!-- Result Modal -->
-  <div id="resultBox">
-    <div id="resultCard">
-      <h2>打字結果</h2>
-      <table>
-        <tr><td class="good">打對：</td><td id="resCorrect">0</td><td>字</td></tr>
-        <tr><td class="bad">打錯：</td><td id="resWrong">0</td><td>字</td></tr>
-        <tr><td>正確率：</td><td id="resAcc">0%</td><td></td></tr>
-        <tr><td>速度：</td><td id="resSpeed">0</td><td>字/分</td></tr>
-        <tr><td>升級資格：</td><td id="resPromo">—</td><td>(門檻 80%)</td></tr>
-      </table>
-      <button onclick="restart()" class="primary">再玩一次</button>
-    </div>
-  </div>
-
-  <!-- Login / teacher modal -->
+<!-- Login / teacher modal（保留，本機密碼 1070） -->
 <div id="login">
   <div id="card">
     <h2 style="margin:0 0 8px">登入遊戲</h2>
@@ -67,13 +67,56 @@
       <div class="rowBtns">
         <button id="enterTeacher" class="primary">進入教師後台</button>
       </div>
-      <small style="opacity:.7">⚠️ 目前為本機版（MVP）。正式版可串接雲端資料庫共用排行。</small>
+      <small style="opacity:.7">⚠️ 正式版請在後端設定 TEACHER_TOKEN 與 MONGODB_URI。</small>
     </div>
   </div>
 </div>
 
-  <div class="toast" id="toast"></div>
+<!-- Teacher Dashboard（NEW） -->
+<div id="teacherDash" style="display:none;">
+  <div id="card" style="max-width:980px">
+    <h2 style="margin:0 0 8px">教師後台</h2>
 
-  <script src="main.js"></script>
+    <div class="rowBtns" style="margin:0 0 10px; display:flex; flex-wrap:wrap;">
+      <button id="btnLoadClasses" class="tag" style="flex:1">重新載入班級清單</button>
+      <button id="btnShowAll" class="tag" style="flex:1">顯示全部排行</button>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+      <div style="flex:1; min-width:180px">
+        <label>班級前三碼（例如 301）</label>
+        <input id="classPrefix" placeholder="301" maxlength="3" inputmode="numeric" />
+      </div>
+      <div style="flex:1; min-width:220px">
+        <label>排行筆數</label>
+        <select id="lbLimit">
+          <option>10</option><option>20</option><option>50</option><option>100</option>
+        </select>
+      </div>
+      <button id="btnLoadClassRank" class="primary" style="flex:1; min-width:160px">載入班內排行</button>
+    </div>
+
+    <div style="margin-top:12px">
+      <table style="width:100%;border-collapse:collapse;background:rgba(12,30,66,.75);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden">
+        <thead><tr><th style="padding:8px 10px;text-align:left;opacity:.8">#</th><th style="padding:8px 10px;text-align:left;opacity:.8">學號</th><th style="padding:8px 10px;text-align:left;opacity:.8">最佳</th></tr></thead>
+        <tbody id="teacherLbBody"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+      <button id="btnClearClass" class="ghost" style="border-color:#ff6b6b;color:#ffb3b3">🧹 清除此班級紀錄</button>
+      <button id="btnClearAll" class="ghost" style="border-color:#ff3b3b;color:#ffbdbd">🗑️ 清除全部學生紀錄</button>
+      <button id="btnCloseTeacher" class="tag" style="margin-left:auto">關閉</button>
+    </div>
+
+    <div style="margin-top:8px">
+      <h3 style="margin:.6rem 0 .2rem 0;font-size:14px;opacity:.9">班級清單</h3>
+      <div id="classList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="main.js"></script>
 </body>
 </html>

@@ -2,10 +2,9 @@
 const db = { students: {} };
 function saveDB() {}
 
-// 你也可以改成 "api"（不帶前斜線），但「根目錄相對」更穩定
 const API_BASE = "/api";
 
-// 通用 JSON 取用（自帶 HTTP 錯誤處理）
+// 通用 JSON
 async function jsonFetch(path, options = {}) {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -19,44 +18,39 @@ async function jsonFetch(path, options = {}) {
   return res.json();
 }
 
-// 封裝各 API
+// 封裝各 API（含教師權限）
 const API = {
   upsertStudent(payload) {
-    return jsonFetch(`${API_BASE}/upsert-student`, {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
+    return jsonFetch(`${API_BASE}/upsert-student`, { method: "POST", body: JSON.stringify(payload) });
   },
   updateBest(payload) {
-    return jsonFetch(`${API_BASE}/update-best`, {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
+    return jsonFetch(`${API_BASE}/update-best`, { method: "POST", body: JSON.stringify(payload) });
   },
-  leaderboard(limit = 10) {
-    return jsonFetch(`${API_BASE}/leaderboard?limit=${limit}`);
+  leaderboard(limit = 10, classPrefix = "") {
+    const qs = new URLSearchParams({ limit });
+    if (classPrefix) qs.set("classPrefix", classPrefix);
+    return jsonFetch(`${API_BASE}/leaderboard?` + qs.toString());
   },
   getStudent(sid) {
     return jsonFetch(`${API_BASE}/student/${sid}`);
+  },
+  getClasses() {
+    return jsonFetch(`${API_BASE}/classes`);
+  },
+  adminClearClass(prefix, token) {
+    return jsonFetch(`${API_BASE}/admin/clear-class`, {
+      method: "POST",
+      headers: { "x-teacher-token": token },
+      body: JSON.stringify({ classPrefix: prefix })
+    });
+  },
+  adminClearAll(token) {
+    return jsonFetch(`${API_BASE}/admin/clear-all`, {
+      method: "POST",
+      headers: { "x-teacher-token": token }
+    });
   }
 };
-
-// --- API 輔助函式 ---
-async function login(sid, name = "") {
-  if (!/^\d{5}$/.test(String(sid))) throw new Error("學號需為 5 碼數字");
-  const resp = await API.upsertStudent({ sid, name });
-  return resp.data; // {sid, name, best}
-}
-
-async function submitBest(sid, score) {
-  const resp = await API.updateBest({ sid, score: Number(score) || 0 });
-  return resp.data.best;
-}
-
-async function loadTopN(n = 10) {
-  const resp = await API.leaderboard(n);
-  return resp.data; // 陣列 [{ sid, name, best }]
-}
 
 // --- 直接從後端查自己 best ---
 async function setBest() {
@@ -70,7 +64,7 @@ async function setBest() {
   }
 }
 
-// --- 隕石圖 ---
+// --- 圖像資源（隕石） ---
 const meteorImg = new Image();
 meteorImg.src = "img/Q.png";
 let imageReady = false;
@@ -105,11 +99,12 @@ addEventListener('resize', resize);
 let meteors=[]; let running=false, score=0, timeLeft=(LEVELS[0].duration), spawnTimer=0;
 let correct=0, wrong=0;
 let me={sid:null,name:''};
+let teacherToken = "";  // 儲存教師密碼（本機 1070；正式版請用 TEACHER_TOKEN）
 
 const setUserChip=()=>document.getElementById('userChip').textContent=me.sid?`${me.sid}`:'未登入';
 const setScore=()=>document.getElementById('score').textContent=score;
 const setTime =()=>document.getElementById('time').textContent=timeLeft;
-const toast = msg => { const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),900) }
+const toast = msg => { const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200) }
 
 // === 鍵盤 ===
 function buildKeyboard(){
@@ -122,8 +117,7 @@ function buildKeyboard(){
   const kbd=document.getElementById('kbd');
   kbd.innerHTML='';
   rows.forEach(r=>{
-    const row=document.createElement('div');
-    row.className='row';
+    const row=document.createElement('div'); row.className='row';
     r.forEach(ch=>{
       const b=document.createElement('button');
       b.className='key '+(ZHUYIN.includes(ch)?keyClass(ch):'');
@@ -201,13 +195,13 @@ function restart(){
   setScore(); setTime(); meteors=[]; draw(); startGame();
 }
 
-// === 排行榜 ===
+// === 排行榜（遊戲內）===
 async function openLeader() {
   const tb = document.getElementById('leaderBody');
   if (!tb) return;
   try {
-    const data = await loadTopN(20);
-    tb.innerHTML = data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
+    const data = await API.leaderboard(20);
+    tb.innerHTML = data.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
   } catch (e) {
     tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
   }
@@ -215,14 +209,78 @@ async function openLeader() {
 }
 function closeLeader(){ document.getElementById('leader').hidden=true; }
 
-// === 登入/教師 ===
-function openTeacherPane(){ const p=document.getElementById('teacherPane'); if(p) p.style.display='block'; }
-function enterTeacher(){ const pass=document.getElementById('tpass').value.trim(); if(pass!=='1070'){ alert('密碼錯誤'); return;} document.getElementById('login').style.display='none'; openLeader(); }
+// === 教師後台 ===
+function openTeacherDash(){ $('teacherDash').style.display='flex'; }
+function closeTeacherDash(){ $('teacherDash').style.display='none'; }
 
-// === 事件 ===
+async function loadClasses() {
+  try {
+    const resp = await API.getClasses();
+    const box = $('classList'); box.innerHTML = "";
+    resp.data.forEach(c => {
+      const btn = document.createElement('button');
+      btn.className = 'tag';
+      btn.textContent = `${c.class}（${c.count}人，Top ${c.top}，Avg ${c.avg}）`;
+      btn.onclick = () => { $('classPrefix').value = c.class; loadClassRank(); };
+      box.appendChild(btn);
+    });
+  } catch (e) {
+    toast('載入班級清單失敗'); console.warn(e);
+  }
+}
+
+async function loadAllRank() {
+  const limit = Number($('lbLimit').value || 20);
+  const tb = $('teacherLbBody'); tb.innerHTML = "";
+  try {
+    const resp = await API.leaderboard(limit);
+    tb.innerHTML = resp.data.map((r,i)=>`<tr><td style="padding:8px 10px">${i+1}</td><td style="padding:8px 10px">${r.sid}</td><td style="padding:8px 10px">${r.best}</td></tr>`).join('');
+  } catch (e) {
+    tb.innerHTML = `<tr><td colspan="3" style="padding:8px 10px">讀取失敗：${e.message}</td></tr>`;
+  }
+}
+
+async function loadClassRank() {
+  const p = $('classPrefix').value.trim();
+  if (!/^\d{3}$/.test(p)) { alert('請輸入正確的班級前三碼（例如 301）'); return; }
+  const limit = Number($('lbLimit').value || 20);
+  const tb = $('teacherLbBody'); tb.innerHTML = "";
+  try {
+    const resp = await API.leaderboard(limit, p);
+    tb.innerHTML = resp.data.map((r,i)=>`<tr><td style="padding:8px 10px">${i+1}</td><td style="padding:8px 10px">${r.sid}</td><td style="padding:8px 10px">${r.best}</td></tr>`).join('');
+  } catch (e) {
+    tb.innerHTML = `<tr><td colspan="3" style="padding:8px 10px">讀取失敗：${e.message}</td></tr>`;
+  }
+}
+
+async function clearClass() {
+  const p = $('classPrefix').value.trim();
+  if (!/^\d{3}$/.test(p)) { alert('請先輸入班級前三碼（例如 301）'); return; }
+  if (!confirm(`確認要清除 ${p} 班全部學生的最佳分數嗎？此動作不可復原。`)) return;
+  try {
+    await API.adminClearClass(p, teacherToken);
+    toast(`已清除 ${p} 班`);
+    await loadClassRank();
+  } catch (e) {
+    alert('清除失敗：' + e.message);
+  }
+}
+
+async function clearAll() {
+  if (!confirm('確認要清除「所有學生」的最佳分數嗎？此動作不可復原。')) return;
+  try {
+    await API.adminClearAll(teacherToken);
+    toast('已清除全部學生紀錄');
+    await loadAllRank();
+  } catch (e) {
+    alert('清除失敗：' + e.message);
+  }
+}
+
+// === 登入/教師 ===
 const $ = id => document.getElementById(id);
 if($('btnStart')) $('btnStart').onclick=toggleRun;
-if($('btnCloseLeader')) $('btnCloseLeader').onclick=closeLeader;
+if($('btnCloseLeader')) $('btnCloseLeader').onclick=()=>{ closeLeader(); };
 if($('btnRestartGame')) $('btnRestartGame').onclick=()=>{ closeLeader(); restart(); };
 
 if ($('go')) $('go').onclick = async () => {
@@ -230,7 +288,7 @@ if ($('go')) $('go').onclick = async () => {
   if (!/^\d{5}$/.test(sid)) { alert('請輸入5位數座號'); return; }
   me.sid = sid; me.name = '';
   try {
-    await login(sid);
+    await API.upsertStudent({ sid });
   } catch (e) {
     alert('登入失敗：' + e.message);
     return;
@@ -242,8 +300,23 @@ if ($('go')) $('go').onclick = async () => {
   setScore(); setTime(); meteors=[]; draw();
 };
 
-if($('teacherOpen')) $('teacherOpen').onclick=openTeacherPane;
-if($('enterTeacher')) $('enterTeacher').onclick=enterTeacher;
+if($('teacherOpen')) $('teacherOpen').onclick=()=>{ const p=document.getElementById('teacherPane'); if(p) p.style.display='block'; };
+if($('enterTeacher')) $('enterTeacher').onclick=()=>{
+  teacherToken = ($('tpass').value || '').trim();
+  if(!teacherToken){ alert('請輸入教師密碼'); return; }
+  // 本機與後端預設相同 1070；正式環境請改 TEACHER_TOKEN
+  $('login').style.display='none';
+  openTeacherDash();
+  loadClasses(); loadAllRank();
+};
+
+// 教師後台的各種按鈕
+if($('btnLoadClasses')) $('btnLoadClasses').onclick=loadClasses;
+if($('btnShowAll')) $('btnShowAll').onclick=loadAllRank;
+if($('btnLoadClassRank')) $('btnLoadClassRank').onclick=loadClassRank;
+if($('btnClearClass')) $('btnClearClass').onclick=clearClass;
+if($('btnClearAll')) $('btnClearAll').onclick=clearAll;
+if($('btnCloseTeacher')) $('btnCloseTeacher').onclick=()=>{ closeTeacherDash(); };
 
 // === 實體鍵盤 ===
 addEventListener('keydown',e=>{
