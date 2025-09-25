@@ -1,10 +1,35 @@
-/* === Local DB (MVP) === */
-const DB_KEY='zhuyin-meteor-v1';
-const db=JSON.parse(localStorage.getItem(DB_KEY)||'{}'); if(!db.students) db.students={};
-const saveDB=()=>localStorage.setItem(DB_KEY,JSON.stringify(db));
-function upsertStudent(sid,name){ if(!db.students[sid]) db.students[sid]={name:name||'',best:0}; else if(name!==undefined) db.students[sid].name=name; saveDB(); }
-function updateBest(sid,score){ if(!db.students[sid]) return; if(score>(db.students[sid].best||0)){ db.students[sid].best=score; saveDB(); } }
-const topN=(n=20)=>Object.entries(db.students).map(([sid,s])=>({sid,name:s.name||'',best:s.best||0})).sort((a,b)=>b.best-a.best).slice(0,n);
+/* === Cloud DB via API === */
+const API_BASE = 'https://<你的-render-網域>'; // 例如 https://zhuyin-api.onrender.com
+
+async function api(path, opts = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
+async function upsertStudent(sid, name) {
+  const r = await api('/api/upsert-student', {
+    method: 'POST',
+    body: JSON.stringify({ sid, name })
+  });
+  return r.data; // {sid,name,best}
+}
+
+async function updateBest(sid, score) {
+  const r = await api('/api/update-best', {
+    method: 'POST',
+    body: JSON.stringify({ sid, score })
+  });
+  return r.data; // {sid,name,best}
+}
+
+async function topN(n = 20) {
+  const r = await api(`/api/leaderboard?limit=${n}`);
+  return r.data; // [{sid,name,best},...]
+}
 function clearAll(){ db.students={}; saveDB(); }
 // 放在檔案前段（常數上面即可）
 const meteorImg = new Image();
@@ -151,7 +176,7 @@ function toggleRun(){ running?pauseGame():startGame(); }
 let timerId=null;
 function ticker(){ clearInterval(timerId); timerId=setInterval(()=>{ if(!running) return; timeLeft--; setTime(); if(timeLeft<=0){ endGame(); } },1000); }
 
-function endGame(){
+async function endGame(){
   running=false; clearInterval(timerId);
   const dur=(LEVELS[level-1]?.duration)||60;
   const elapsed=dur-Math.max(0,timeLeft);
@@ -160,7 +185,13 @@ function endGame(){
   const speed=Math.round(correct/minutes);
   const pass=acc>=ACC_THRESHOLD;
 
-  updateBest(me.sid,score); setBest();
+  try {
+  await updateBest(me.sid, score);
+  setBest();
+} catch (e) {
+  console.warn('更新最佳分數失敗：', e);
+}
+
 
   if(pass){
     if(level<LEVELS.length){ level++; toast('🎉 升到第 '+level+' 級！'); }
@@ -180,7 +211,17 @@ function restart(){
 }
 
 /* === Leaderboard === */
-function openLeader(){ const data=topN(20); const tb=document.getElementById('leaderBody'); if(tb) tb.innerHTML=data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join(''); document.getElementById('leader').hidden=false; }
+async function openLeader() {
+  const tb = document.getElementById('leaderBody');
+  if (!tb) return;
+  try {
+    const data = await topN(20);
+    tb.innerHTML = data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
+  } catch (e) {
+    tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
+  }
+  document.getElementById('leader').hidden = false;
+}
 function closeLeader(){ document.getElementById('leader').hidden=true; }
 
 /* === Login/Teacher === */
@@ -193,16 +234,24 @@ if($('btnStart')) $('btnStart').onclick=toggleRun;
 if($('btnCloseLeader')) $('btnCloseLeader').onclick=closeLeader;
 if($('btnRestartGame')) $('btnRestartGame').onclick=()=>{ closeLeader(); restart(); };
 
-if($('go')) $('go').onclick=()=>{
-  let sid=$('sid').value.trim().replace(/\D/g,'');
-  if(!/^\d{5}$/.test(sid)){ alert('請輸入5位數座號'); return; }
-  me.sid=sid; me.name='';
-  upsertStudent(sid,''); setUserChip(); setBest();
-  $('login').style.display='none';
+if ($('go')) $('go').onclick = async () => {
+  let sid = $('sid').value.trim().replace(/\D/g,'');
+  if (!/^\d{5}$/.test(sid)) { alert('請輸入5位數座號'); return; }
+  me.sid = sid; me.name = '';
+  try {
+    const data = await upsertStudent(sid, '');
+    // data.best 可拿來顯示既有最佳
+  } catch (e) {
+    alert('登入失敗：' + e.message);
+    return;
+  }
+  setUserChip(); setBest();
+  $('login').style.display = 'none';
   score=0; correct=0; wrong=0; level=1;
   timeLeft=(LEVELS[level-1]?.duration)||60;
   setScore(); setTime(); meteors=[]; draw();
 };
+
 
 if($('teacherOpen')) $('teacherOpen').onclick=openTeacherPane;
 if($('enterTeacher')) $('enterTeacher').onclick=enterTeacher;
