@@ -287,12 +287,11 @@ if ($('go')) $('go').onclick = async () => {
   setScore(); setTime(); meteors=[]; draw();
 };
 
-if($('teacherOpen')) $('teacherOpen').onclick=()=>{ const p=$('teacherPane'); if(p) p.style.display='block'; };
-if($('enterTeacher')) $('enterTeacher').onclick=()=>{
-  teacherToken = ($('tpass').value || '').trim();
-  if(!teacherToken){ alert('請輸入教師密碼'); return; }
-  $('login').style.display='none'; openTeacherDash(); loadClasses(); loadAllRank();
+if ($('teacherOpen')) $('teacherOpen').onclick = (e) => {
+  // 若是 <a href="/teacher"> 就讓它前往；保險起見加上這行也可
+  // e.preventDefault(); location.href = '/teacher';
 };
+
 
 // 成績視窗內的「再玩一次」按鈕已綁定到 restart()
 

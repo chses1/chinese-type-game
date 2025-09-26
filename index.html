@@ -61,18 +61,8 @@
     <input id="sid" placeholder="例如：30130" inputmode="numeric" maxlength="5" />
     <div class="rowBtns">
       <button id="go" class="primary">登入</button>
-      <button id="teacherOpen" class="ghost">教師後台</button>
-    </div>
-    <div id="teacherPane" style="display:none;margin-top:14px;padding:10px;border:1px dashed rgba(255,255,255,.35);border-radius:12px">
-      <label>教師密碼</label>
-      <input id="tpass" placeholder="輸入後台密碼" />
-      <div class="rowBtns">
-        <button id="enterTeacher" class="primary">進入教師後台</button>
-      </div>
-      <small style="opacity:.7">⚠️ 正式版請在後端設定 TEACHER_TOKEN 與 MONGODB_URI。</small>
-    </div>
-  </div>
-</div>
+      <a id="teacherOpen" class="ghost" href="/teacher">教師後台</a>
+
 
 <div class="toast" id="toast"></div>
 <script src="main.js"></script>
