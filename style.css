@@ -96,15 +96,11 @@ header .chip {
 .panel h3{margin:.2rem 0 .2rem 0;font-size:14px;opacity:.9}
 .panel .stat{font-weight:700;color:var(--accent)}
 
-/* result modal */
-#resultBox{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:30}
-#resultCard{width:min(400px,92vw);background:#0c2a57;border:2px solid rgba(255,255,255,.25);padding:20px;border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.55);text-align:center}
-#resultCard h2{margin:0 0 12px;color:var(--accent)}
-#resultCard table{width:100%;margin:12px 0;border-collapse:collapse}
-#resultCard td{padding:6px;text-align:center}
-#resultCard .good{color:var(--good)}
-#resultCard .bad{color:var(--bad)}
-#resultCard button{margin-top:12px}
+/* ===== 成績視窗（已存在，略作微調） ===== */
+#resultBox{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.55); z-index:50; }
+#resultCard{ width:min(460px,92vw); background:#0c2a57; border:2px solid rgba(255,255,255,.25); padding:22px; border-radius:16px; box-shadow:0 12px 30px rgba(0,0,0,.55); text-align:center; }
+#resultCard h2{ margin:0 0 12px; color:var(--accent); }
+#resultCard td{ padding:8px; }
 
 /* login */
 #login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
@@ -115,33 +111,42 @@ button.primary{background:linear-gradient(180deg,#2f7cff,#1b5bd1);border:none;fo
 button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
 .rowBtns{display:flex;gap:8px;margin-top:10px}
 
-/* leaderboard */
-#leader{position:fixed;left:10px;top:70px;z-index:4}
-#leader table{border-collapse:collapse;background:rgba(12,30,66,.75);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden}
-#leader th,#leader td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.08)}
-#leader th{font-size:12px;text-align:left;opacity:.8}
-#leader td{font-size:14px}
-
-.tag{display:inline-block;padding:.15rem .45rem;border-radius:999px;background:rgba(255,255,255,.1);font-size:12px}
-
-/* toast */
-.toast {
+/* ===== 置中排行榜（NEW） ===== */
+#leader{
   position:fixed;
-  left:50%;
-  transform:translateX(-50%);
-  bottom:66dvh;
-  background:rgba(0,0,0,.5);
-  padding:16px 24px;        /* ← 原本 8px 12px，加大一倍 */
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.2);
-  font-size: 32px;          /* ← 新增字體大小（原本沒設，繼承了 body 預設 16px） */
-  font-weight: bold;        /* ← 讓 +1/-1 更顯眼 */
-  opacity:0;
-  transition:opacity .25s;
-  z-index:10;
+  inset:0;
+  display:none;                /* 由 JS 加上 .show 時才顯示 */
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.55);
+  z-index:40;
+}
+#leader.show{ display:flex; }
+
+#leader table{
+  border-collapse:collapse;
+  background:rgba(12,30,66,.9);
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:16px;
+  overflow:hidden;
+  min-width:min(92vw, 680px);
+}
+#leader th, #leader td{
+  padding:14px 16px;           /* 放大 */
+  border-bottom:1px solid rgba(255,255,255,.1);
+  font-size:20px;              /* 放大字體 */
+}
+#leader th{ opacity:.85; font-weight:700; }
+
+#leader + div button,           /* 排行榜下方兩顆按鈕區 */
+#leader .tag{
+  font-size:16px;
 }
 
-.toast.show{opacity:1}
+/* ===== Toast 放大 ===== */
+.toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:66dvh; background:rgba(0,0,0,.5); padding:16px 24px; border-radius:999px; border:1px solid rgba(255,255,255,.2); font-size:32px; font-weight:700; opacity:0; transition:opacity .25s; z-index:10; }
+.toast.show{ opacity:1; }
 
 /* 新增：估計抬頭高度，讓 canvas 填滿 header 下面到螢幕底部 */
 :root{
