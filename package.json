@@ -4,7 +4,7 @@
   "type": "module",
   "engines": { "node": ">=18 <23" },
   "scripts": {
-    "start": "node server/server.js"
+    "start": "node server/server.cjs"
   },
   "dependencies": {
     "compression": "^1.7.4",
