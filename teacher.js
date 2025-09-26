@@ -71,7 +71,7 @@ async function loadAllRank(){
 
 async function loadClassRank(){
   const p = $('classPrefix').value.trim();
-  if(!/^\d{3}$/.test(p)){ alert('請輸入正確的班級前三碼（100–999，例如 301）'); return; }
+  if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼（三碼，允許 0 開頭，例如 001、301）'); return; }
   const limit = Number($('lbLimit').value || 20);
   const tb = $('teacherLbBody'); tb.innerHTML = "";
   try {
@@ -86,7 +86,7 @@ async function clearClass(){
   const p = $('classPrefix').value.trim();
   const token = getToken();
   if(!token){ alert('請先於畫面頂部解鎖（輸入教師密碼）。'); return; }
-  if(!/^\d{3}$/.test(p)){ alert('請先輸入正確的班級前三碼（100–999，例如 301）'); return; }
+  if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼（三碼，允許 0 開頭，例如 001、301）'); return; }
   if(!confirm(`確認要清除 ${p} 班「全部學生紀錄（含學號）」嗎？`)) return;
   try{
     await API.adminClearClass(p, token);
@@ -122,6 +122,16 @@ $('btnClearAll').onclick      = clearAll;
   const app   = document.getElementById('app');
   const lock  = document.getElementById('lock');
   const token = getToken();
+
+  // 依輸入啟用/停用「清除此班級紀錄」按鈕
+(function wirePrefixGuard(){
+  const ipt = document.getElementById('classPrefix');
+  const btn = document.getElementById('btnClearClass');
+  if(!ipt || !btn) return;
+  const toggle = () => { btn.disabled = !/^\d{3}$/.test((ipt.value||'').trim()); };
+  ipt.addEventListener('input', toggle);
+  toggle(); // 初始狀態
+})();
 
   function unlock() {
     setToken( (document.getElementById('lockPass').value || '').trim() );
