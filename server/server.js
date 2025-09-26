@@ -1,36 +1,29 @@
-// server/server.js
-import express from "express";
-import cors from "cors";
-import { MongoClient } from "mongodb";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+// server.js — 根目錄版（CommonJS，相容性高）
+const express = require("express");
+const cors = require("cors");
+const { MongoClient } = require("mongodb");
+const path = require("node:path");
 
 // === 路徑 ===
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-const ROOT_DIR   = path.join(__dirname, "..");
+const __dirname = __dirname || path.dirname(process.argv[1]);
+const ROOT_DIR  = path.join(__dirname); // ✅ 重點：靜態根目錄就是專案根目錄
 
 // === 環境變數（本機可用 .env）===
-if (!process.env.MONGODB_URI) {
-  try {
-    const { config } = await import("dotenv");
-    config();
-    console.log("[dotenv] loaded .env for local dev");
-  } catch {
-    console.log("[dotenv] dotenv not installed; skip");
-  }
-}
+try {
+  require("dotenv").config();
+} catch { /* no-op */ }
 
 const app = express();
 app.use(express.json());
+
 if (process.env.CORS_ORIGIN) {
   app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
 }
 
 // 健康檢查
-app.get("/healthz", (req, res) => res.send("ok"));
+app.get("/healthz", (_req, res) => res.send("ok"));
 
-// 前端靜態檔案
+// 前端靜態檔案（index.html、teacher.html、JS/CSS…）
 app.use(express.static(ROOT_DIR));
 
 // === MongoDB ===
@@ -56,7 +49,7 @@ async function initMongo() {
     console.error("[mongo] connect failed:", err.message);
   }
 }
-await initMongo();
+initMongo();
 
 function requireDB(res) {
   if (!students) {
@@ -96,7 +89,7 @@ app.post("/api/update-best", async (req, res) => {
   res.json({ ok: true, data: { sid: String(sid), best } });
 });
 
-// 支援班級過濾：/api/leaderboard?limit=20&classPrefix=301   // NEW
+// 排行榜（支援班級過濾：?limit=50&classPrefix=301）
 app.get("/api/leaderboard", async (req, res) => {
   if (!requireDB(res)) return;
   const limit = Math.min(Number(req.query.limit || 10), 100);
@@ -120,8 +113,8 @@ app.get("/api/student/:sid", async (req, res) => {
   res.json({ ok: true, data: { sid, best: Number(doc?.best || 0) } });
 });
 
-// 取得現有班級清單與統計（依前三碼分組） // NEW
-app.get("/api/classes", async (req, res) => {
+// 班級統計
+app.get("/api/classes", async (_req, res) => {
   if (!requireDB(res)) return;
   const pipeline = [
     { $project: { _id: 0, sid: 1, best: 1, class: { $substr: ["$sid", 0, 3] } } },
@@ -134,7 +127,7 @@ app.get("/api/classes", async (req, res) => {
 });
 
 // === 教師權限 ===
-const TEACHER_TOKEN = process.env.TEACHER_TOKEN || "1070"; // CHG: 可改環境變數
+const TEACHER_TOKEN = process.env.TEACHER_TOKEN || "1070";
 function adminAuth(req, res, next) {
   const token = req.header("x-teacher-token") || req.query.token;
   if (token !== TEACHER_TOKEN) return res.status(401).json({ ok: false, error: "unauthorized" });
@@ -143,6 +136,7 @@ function adminAuth(req, res, next) {
 
 // 清除某班（刪除 or 歸零）
 app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
+  if (!requireDB(res)) return;
   const mode = String(req.body?.mode || '').trim();
   const classPrefix = String(req.body?.classPrefix || '').trim();
   if (!/^\d{3}$/.test(classPrefix)) {
@@ -151,7 +145,7 @@ app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
   try {
     const filter = { sid: new RegExp("^" + classPrefix) };
     if (mode === "delete") {
-      await students.deleteMany(filter);          // ← 使用 students 集合
+      await students.deleteMany(filter);
     } else {
       await students.updateMany(filter, { $set: { best: 0 } });
     }
@@ -162,8 +156,9 @@ app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
 });
 
 // 清除全部（刪除 or 歸零）
-app.post('/api/admin/clear-all', adminAuth, async (req, res) => {
-  const mode = String(req.body?.mode || '').trim();
+app.post('/api/admin/clear-all', adminAuth, async (_req, res) => {
+  if (!requireDB(res)) return;
+  const mode = String(_req.body?.mode || '').trim();
   try {
     if (mode === "delete") {
       await students.deleteMany({});
@@ -176,18 +171,15 @@ app.post('/api/admin/clear-all', adminAuth, async (req, res) => {
   }
 });
 
-
-
 // API 404
-app.use("/api", (req, res) => res.status(404).json({ ok: false, error: "not_found" }));
+app.use("/api", (_req, res) => res.status(404).json({ ok: false, error: "not_found" }));
 
-// 在其他路由之上加入（確保位於 SPA fallback 前）
+// 教師後台頁
 app.get("/teacher", (_req, res) => {
   res.sendFile(path.join(ROOT_DIR, "teacher.html"));
 });
 
-
-// SPA fallback
+// SPA fallback（其餘路由丟給前端 index.html）
 app.get(/^\/(?!api\/).*/, (_req, res) => {
   res.sendFile(path.join(ROOT_DIR, "index.html"));
 });
