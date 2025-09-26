@@ -51,6 +51,19 @@ header .chip {
   max-height:42dvh;overflow:auto
 }
 
+/* 通用小按鈕：支援 <a> 與 <button> 皆可使用 .tag / .ghost */
+.tag, a.tag, button.tag {
+  display:inline-block; padding:10px 14px; border-radius:12px;
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18);
+  color:#fff; text-align:center; text-decoration:none; cursor:pointer;
+}
+.ghost, a.ghost, button.ghost {
+  display:inline-block; padding:10px 14px; border-radius:12px;
+  background:transparent; border:1px dashed rgba(255,255,255,.35);
+  color:#fff; text-align:center; text-decoration:none; cursor:pointer;
+}
+
+
 /* 一列就是一行鍵盤，不換行；按鍵平均分配寬度 */
 .row{
   display:flex;

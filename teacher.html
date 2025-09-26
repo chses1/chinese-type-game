@@ -32,6 +32,23 @@
     </div>
   </header>
 
+  <!-- 🔐 鎖定層：沒有 token 先要求輸入 -->
+  <div id="lock" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:3">
+    <div class="card" style="width:min(420px,92vw);text-align:center">
+      <h2 style="margin:.2rem 0 1rem">輸入教師密碼</h2>
+      <input id="lockPass" placeholder="教師密碼" />
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="lockEnter" class="primary">解鎖進入</button>
+        <a href="/" class="ghost">返回首頁</a>
+      </div>
+      <div class="muted" style="margin-top:8px">密碼僅保存在本機 <code>localStorage</code> 以作為 API 權杖。</div>
+    </div>
+  </div>
+
+  <!-- 把主介面包起來，未解鎖前保持隱藏 -->
+  <main id="app" class="container" style="display:none">
+    <!-- 原本 main 內容完整保留 ↓↓↓ -->
+
   <main class="container">
     <div class="card">
       <div class="toolbar">

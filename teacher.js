@@ -98,8 +98,37 @@ $('btnClearClass').onclick  = clearClass;
 $('btnClearAll').onclick    = clearAll;
 $('btnSaveToken').onclick   = ()=>{ setToken(($('tpass').value||'').trim()); toast('已套用密碼'); };
 
-// 初始
+// 初始：若無 token 先出現鎖定層
 (function init(){
-  $('tpass').value = getToken();
-  loadClasses(); loadAllRank();
+  const app   = document.getElementById('app');
+  const lock  = document.getElementById('lock');
+  const token = getToken();
+
+  function unlock() {
+    setToken( (document.getElementById('lockPass').value || '').trim() );
+    if (!getToken()) { alert('請輸入教師密碼'); return; }
+    lock.style.display = 'none';
+    app.style.display  = '';
+    // 真正開始載入資料
+    document.getElementById('tpass').value = getToken();
+    loadClasses(); 
+    loadAllRank();
+    toast('已解鎖');
+  }
+
+  // 綁定鎖定層按鈕
+  const btnEnter = document.getElementById('lockEnter');
+  if (btnEnter) btnEnter.onclick = unlock;
+
+  if (!token) {
+    // 無密碼 → 顯示鎖，隱藏主畫面
+    lock.style.display = 'flex';
+    app.style.display  = 'none';
+  } else {
+    // 已有密碼 → 直接載入
+    app.style.display  = '';
+    document.getElementById('tpass').value = token;
+    loadClasses(); 
+    loadAllRank();
+  }
 })();
