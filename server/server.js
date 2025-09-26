@@ -141,26 +141,41 @@ function adminAuth(req, res, next) {
   next();
 }
 
-// 重設某班級（前三碼）best 為 0   // NEW
-app.post("/api/admin/clear-class", adminAuth, async (req, res) => {
-  if (!requireDB(res)) return;
-  const { classPrefix } = req.body || {};
-  if (!/^\d{3}$/.test(String(classPrefix))) {
-    return res.status(400).json({ ok: false, error: "class_prefix_invalid" });
+// 清除某班
+app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
+  const { classPrefix, mode } = req.body;
+  if (!/^[1-9]\d{2}$/.test(classPrefix)) {
+    return res.status(400).json({ ok:false, error:"class_prefix_invalid" });
   }
-  const r = await students.updateMany(
-    { sid: new RegExp("^" + classPrefix) },
-    { $set: { best: 0, updatedAt: new Date() } }
-  );
-  res.json({ ok: true, data: { matched: r.matchedCount, modified: r.modifiedCount } });
+  try {
+    if (mode === "delete") {
+      // 刪掉整個班級的紀錄（包含學號）
+      await Score.deleteMany({ sid: new RegExp("^" + classPrefix) });
+    } else {
+      // 只把分數清零
+      await Score.updateMany({ sid: new RegExp("^" + classPrefix) }, { $set: { best: 0 } });
+    }
+    res.json({ ok:true });
+  } catch (e) {
+    res.status(500).json({ ok:false, error:e.message });
+  }
 });
 
-// 清空全部 best（保留學生，但將 best 歸零） // NEW
-app.post("/api/admin/clear-all", adminAuth, async (_req, res) => {
-  if (!requireDB(res)) return;
-  const r = await students.updateMany({}, { $set: { best: 0, updatedAt: new Date() } });
-  res.json({ ok: true, data: { matched: r.matchedCount, modified: r.modifiedCount } });
+// 清除全部
+app.post('/api/admin/clear-all', adminAuth, async (req, res) => {
+  const { mode } = req.body;
+  try {
+    if (mode === "delete") {
+      await Score.deleteMany({});
+    } else {
+      await Score.updateMany({}, { $set: { best: 0 } });
+    }
+    res.json({ ok:true });
+  } catch (e) {
+    res.status(500).json({ ok:false, error:e.message });
+  }
 });
+
 
 // API 404
 app.use("/api", (req, res) => res.status(404).json({ ok: false, error: "not_found" }));

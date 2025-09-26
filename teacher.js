@@ -23,12 +23,21 @@ const API = {
   },
   getClasses(){ return jsonFetch(`${API_BASE}/classes`); },
   adminClearClass(prefix, token){
-    return jsonFetch(`${API_BASE}/admin/clear-class`, { method:"POST", headers:{ "x-teacher-token": token }, body:JSON.stringify({ classPrefix: prefix }) });
+    return jsonFetch(`${API_BASE}/admin/clear-class`, { 
+      method:"POST", 
+      headers:{ "x-teacher-token": token }, 
+      body: JSON.stringify({ classPrefix: prefix, mode: "delete" })   // 👈 新增刪除模式
+    });
   },
   adminClearAll(token){
-    return jsonFetch(`${API_BASE}/admin/clear-all`, { method:"POST", headers:{ "x-teacher-token": token } });
+    return jsonFetch(`${API_BASE}/admin/clear-all`, { 
+      method:"POST", 
+      headers:{ "x-teacher-token": token }, 
+      body: JSON.stringify({ mode: "delete" })   // 👈 新增刪除模式
+    });
   }
 };
+
 
 // token 快取
 function getToken(){ return localStorage.getItem('teacher-token') || ''; }
