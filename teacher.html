@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>教師後台｜地球保衛戰</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body{ background: radial-gradient(1200px 600px at 60% -10%, #0f274f 0%, #08182e 60%, #061225 100%) fixed; }
+    .container{ max-width: 1040px; margin: 24px auto; padding: 0 16px; }
+    .card{ background: rgba(12,30,66,.88); backdrop-filter: blur(8px);
+           border: 1px solid rgba(255,255,255,.15); border-radius: 16px; padding: 16px; }
+    h1{ margin: 0 0 12px; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:8px; }
+    .row > *{ flex:1; min-width: 200px; }
+    table{ width:100%; border-collapse: collapse; background: rgba(8,22,48,.9); border-radius: 12px; overflow:hidden; }
+    th,td{ padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.08); }
+    th{ opacity:.85; text-align:left; }
+    .toolbar{ display:flex; gap:10px; flex-wrap:wrap; }
+    .toolbar .tag, .toolbar .primary{ flex:1; min-width: 160px; }
+    .danger{ border-color:#ff3b3b !important; color:#ffbdbd !important; }
+    .warning{ border-color:#ff6b6b !important; color:#ffb3b3 !important; }
+    header.top{ position:sticky; top:0; z-index:2; background:linear-gradient(180deg,rgba(0,0,0,.35),transparent); padding:8px 0; }
+    .muted{ opacity:.75; font-size:.9rem; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="container" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <h1 style="flex:1">教師後台</h1>
+      <a href="/" class="tag">⬅️ 回到遊戲</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <div class="toolbar">
+        <button id="btnLoadClasses" class="tag">重新載入班級清單</button>
+        <button id="btnShowAll" class="tag">顯示全部排行</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>班級前三碼（例如 301）</label>
+          <input id="classPrefix" placeholder="301" maxlength="3" inputmode="numeric" />
+        </div>
+        <div>
+          <label>排行筆數</label>
+          <select id="lbLimit"><option>10</option><option>20</option><option>50</option><option>100</option></select>
+        </div>
+        <div style="flex:0 0 auto">
+          <button id="btnLoadClassRank" class="primary">載入班內排行</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>教師密碼（僅首次或變更時需要）</label>
+          <input id="tpass" placeholder="輸入後台密碼" />
+          <div class="muted">會快取在本機的 <code>localStorage</code>，僅做 API 權杖標頭。</div>
+        </div>
+        <div style="flex:0 0 auto; display:flex; gap:10px; align-items:flex-end;">
+          <button id="btnSaveToken" class="tag">套用密碼</button>
+          <button id="btnClearClass" class="ghost warning">🧹 清除此班級紀錄</button>
+          <button id="btnClearAll" class="ghost danger">🗑️ 清除全部學生紀錄</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <table>
+          <thead><tr><th style="width:64px">#</th><th>學號</th><th style="width:120px">最佳</th></tr></thead>
+          <tbody id="teacherLbBody"><tr><td colspan="3">尚未載入資料</td></tr></tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:10px">
+        <h3 style="margin:.6rem 0 .2rem 0;font-size:14px;opacity:.9">班級清單</h3>
+        <div id="classList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="teacher.js"></script>
+</body>
+</html>

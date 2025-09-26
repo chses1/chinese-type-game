@@ -165,6 +165,12 @@ app.post("/api/admin/clear-all", adminAuth, async (_req, res) => {
 // API 404
 app.use("/api", (req, res) => res.status(404).json({ ok: false, error: "not_found" }));
 
+// 在其他路由之上加入（確保位於 SPA fallback 前）
+app.get("/teacher", (_req, res) => {
+  res.sendFile(path.join(ROOT_DIR, "teacher.html"));
+});
+
+
 // SPA fallback
 app.get(/^\/(?!api\/).*/, (_req, res) => {
   res.sendFile(path.join(ROOT_DIR, "index.html"));

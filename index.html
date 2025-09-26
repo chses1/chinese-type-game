@@ -74,50 +74,6 @@
   </div>
 </div>
 
-<!-- Teacher Dashboard（NEW） -->
-<div id="teacherDash" style="display:none;">
-  <div id="card" style="max-width:980px">
-    <h2 style="margin:0 0 8px">教師後台</h2>
-
-    <div class="rowBtns" style="margin:0 0 10px; display:flex; flex-wrap:wrap;">
-      <button id="btnLoadClasses" class="tag" style="flex:1">重新載入班級清單</button>
-      <button id="btnShowAll" class="tag" style="flex:1">顯示全部排行</button>
-    </div>
-
-    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-      <div style="flex:1; min-width:180px">
-        <label>班級前三碼（例如 301）</label>
-        <input id="classPrefix" placeholder="301" maxlength="3" inputmode="numeric" />
-      </div>
-      <div style="flex:1; min-width:220px">
-        <label>排行筆數</label>
-        <select id="lbLimit">
-          <option>10</option><option>20</option><option>50</option><option>100</option>
-        </select>
-      </div>
-      <button id="btnLoadClassRank" class="primary" style="flex:1; min-width:160px">載入班內排行</button>
-    </div>
-
-    <div style="margin-top:12px">
-      <table style="width:100%;border-collapse:collapse;background:rgba(12,30,66,.75);backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden">
-        <thead><tr><th style="padding:8px 10px;text-align:left;opacity:.8">#</th><th style="padding:8px 10px;text-align:left;opacity:.8">學號</th><th style="padding:8px 10px;text-align:left;opacity:.8">最佳</th></tr></thead>
-        <tbody id="teacherLbBody"></tbody>
-      </table>
-    </div>
-
-    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
-      <button id="btnClearClass" class="ghost" style="border-color:#ff6b6b;color:#ffb3b3">🧹 清除此班級紀錄</button>
-      <button id="btnClearAll" class="ghost" style="border-color:#ff3b3b;color:#ffbdbd">🗑️ 清除全部學生紀錄</button>
-      <button id="btnCloseTeacher" class="tag" style="margin-left:auto">關閉</button>
-    </div>
-
-    <div style="margin-top:8px">
-      <h3 style="margin:.6rem 0 .2rem 0;font-size:14px;opacity:.9">班級清單</h3>
-      <div id="classList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 <script src="main.js"></script>
 </body>
