@@ -36,7 +36,7 @@
   <div id="lock" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:3">
     <div class="card" style="width:min(420px,92vw);text-align:center">
       <h2 style="margin:.2rem 0 1rem">輸入教師密碼</h2>
-      <input id="lockPass" placeholder="教師密碼" />
+      <input id="lockPass" type="password" placeholder="教師密碼" />
       <div style="display:flex;gap:8px;margin-top:10px">
         <button id="lockEnter" class="primary">解鎖進入</button>
         <a href="/" class="ghost">返回首頁</a>
@@ -72,8 +72,8 @@
 
       <div class="row">
         <div>
-          <label>教師密碼（僅首次或變更時需要）</label>
-          <input id="tpass" placeholder="輸入後台密碼" />
+        <label>教師密碼（僅首次或變更時需要）</label>
+        <input id="tpass" type="password" placeholder="輸入後台密碼" />
           <div class="muted">會快取在本機的 <code>localStorage</code>，僅做 API 權杖標頭。</div>
         </div>
         <div style="flex:0 0 auto; display:flex; gap:10px; align-items:flex-end;">
