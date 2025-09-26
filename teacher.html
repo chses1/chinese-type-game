@@ -71,17 +71,15 @@
       </div>
 
       <div class="row">
-        <div>
-        <label>教師密碼（僅首次或變更時需要）</label>
-        <input id="tpass" type="password" placeholder="輸入後台密碼" />
-          <div class="muted">會快取在本機的 <code>localStorage</code>，僅做 API 權杖標頭。</div>
-        </div>
-        <div style="flex:0 0 auto; display:flex; gap:10px; align-items:flex-end;">
-          <button id="btnSaveToken" class="tag">套用密碼</button>
-          <button id="btnClearClass" class="ghost warning">🧹 清除此班級紀錄</button>
-          <button id="btnClearAll" class="ghost danger">🗑️ 清除全部學生紀錄</button>
-        </div>
-      </div>
+  <div class="muted" style="flex:1 1 auto">
+    先於上方「輸入教師密碼」解鎖後再操作。清除功能僅在已解鎖狀態下啟用。
+  </div>
+  <div style="flex:0 0 auto; display:flex; gap:10px; align-items:flex-end;">
+    <button id="btnClearClass" class="ghost warning">🧹 清除此班級紀錄</button>
+    <button id="btnClearAll" class="ghost danger">🗑️ 清除全部學生紀錄</button>
+  </div>
+</div>
+
 
       <div style="margin-top:12px">
         <table>

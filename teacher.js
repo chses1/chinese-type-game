@@ -61,7 +61,7 @@ async function loadAllRank(){
 
 async function loadClassRank(){
   const p = $('classPrefix').value.trim();
-  if(!/^\d{3}$/.test(p)){ alert('請輸入正確的班級前三碼（例如 301）'); return; }
+  if(!/^[1-9]\d{2}$/.test(p)){ alert('請輸入正確的班級前三碼（100–999，例如 301）'); return; }
   const limit = Number($('lbLimit').value || 20);
   const tb = $('teacherLbBody'); tb.innerHTML = "";
   try {
@@ -75,13 +75,17 @@ async function loadClassRank(){
 async function clearClass(){
   const p = $('classPrefix').value.trim();
   const token = getToken();
-  if(!token){ alert('請先輸入教師密碼並按「套用密碼」。'); return; }
-  if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼（例如 301）'); return; }
+  if(!token){ alert('請先於畫面頂部解鎖（輸入教師密碼）。'); return; }
+  if(!/^[1-9]\d{2}$/.test(p)){ alert('請先輸入正確的班級前三碼（100–999，例如 301）'); return; }
   if(!confirm(`確認要清除 ${p} 班全部學生的最佳分數嗎？`)) return;
-  try{ await API.adminClearClass(p, token); toast(`已清除 ${p} 班`); await loadClassRank(); }
-  catch(e){ alert('清除失敗：' + e.message); }
+  try{
+    await API.adminClearClass(p, token);
+    toast(`已清除 ${p} 班`);
+    await loadClassRank();
+  }catch(e){
+    alert('清除失敗：' + e.message);
+  }
 }
-
 async function clearAll(){
   const token = getToken();
   if(!token){ alert('請先輸入教師密碼並按「套用密碼」。'); return; }
@@ -96,7 +100,7 @@ $('btnShowAll').onclick     = loadAllRank;
 $('btnLoadClassRank').onclick= loadClassRank;
 $('btnClearClass').onclick  = clearClass;
 $('btnClearAll').onclick    = clearAll;
-$('btnSaveToken').onclick   = ()=>{ setToken(($('tpass').value||'').trim()); toast('已套用密碼'); };
+
 
 // 初始：若無 token 先出現鎖定層
 (function init(){
@@ -105,16 +109,14 @@ $('btnSaveToken').onclick   = ()=>{ setToken(($('tpass').value||'').trim()); toa
   const token = getToken();
 
   function unlock() {
-    setToken( (document.getElementById('lockPass').value || '').trim() );
-    if (!getToken()) { alert('請輸入教師密碼'); return; }
-    lock.style.display = 'none';
-    app.style.display  = '';
-    // 真正開始載入資料
-    document.getElementById('tpass').value = getToken();
-    loadClasses(); 
-    loadAllRank();
-    toast('已解鎖');
-  }
+  setToken( (document.getElementById('lockPass').value || '').trim() );
+  if (!getToken()) { alert('請輸入教師密碼'); return; }
+  lock.style.display = 'none';
+  app.style.display  = '';
+  loadClasses();
+  loadAllRank();
+  toast('已解鎖');
+}
 
   // 綁定鎖定層按鈕
   const btnEnter = document.getElementById('lockEnter');
