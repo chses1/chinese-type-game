@@ -149,11 +149,11 @@ app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
   }
   try {
     if (mode === "delete") {
-      // 刪掉整個班級的紀錄（包含學號）
-      await Score.deleteMany({ sid: new RegExp("^" + classPrefix) });
+      // ✅ 正確：刪掉整個班級的紀錄（包含學號）
+      await students.deleteMany({ sid: new RegExp("^" + classPrefix) });
     } else {
-      // 只把分數清零
-      await Score.updateMany({ sid: new RegExp("^" + classPrefix) }, { $set: { best: 0 } });
+      // ✅ 正確：只把分數清零
+      await students.updateMany({ sid: new RegExp("^" + classPrefix) }, { $set: { best: 0 } });
     }
     res.json({ ok:true });
   } catch (e) {
@@ -166,15 +166,17 @@ app.post('/api/admin/clear-all', adminAuth, async (req, res) => {
   const { mode } = req.body;
   try {
     if (mode === "delete") {
-      await Score.deleteMany({});
+      // ✅ 改成 students
+      await students.deleteMany({});
     } else {
-      await Score.updateMany({}, { $set: { best: 0 } });
+      await students.updateMany({}, { $set: { best: 0 } });
     }
     res.json({ ok:true });
   } catch (e) {
     res.status(500).json({ ok:false, error:e.message });
   }
 });
+
 
 
 // API 404
