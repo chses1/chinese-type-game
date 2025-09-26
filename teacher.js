@@ -52,7 +52,14 @@ async function loadClasses(){
       const btn=document.createElement('button');
       btn.className='tag';
       btn.textContent=`${c.class}（${c.count}人，Top ${c.top}，Avg ${c.avg}）`;
-      btn.onclick=()=>{ $('classPrefix').value=c.class; loadClassRank(); };
+            btn.onclick=()=>{
+        const ipt = $('classPrefix');
+        if (!ipt) return;
+        ipt.value = c.class;
+        // 觸發 input 事件，確保清除按鈕會重新啟用
+        ipt.dispatchEvent(new Event('input', { bubbles: true }));
+        loadClassRank();
+      };
       box.appendChild(btn);
     });
   }catch(e){ toast('載入班級清單失敗'); console.warn(e); }
