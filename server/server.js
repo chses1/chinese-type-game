@@ -1,21 +1,23 @@
-// server.js — 根目錄版（CommonJS，相容性高）
-const express = require("express");
-const cors = require("cors");
-const { MongoClient } = require("mongodb");
-const path = require("node:path");
+// server/server.js — ESM 版本，支援 "type": "module"
+import express from "express";
+import cors from "cors";
+import { MongoClient } from "mongodb";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 
-// === 路徑 ===
-const __dirname = __dirname || path.dirname(process.argv[1]);
-const ROOT_DIR  = path.join(__dirname); // ✅ 重點：靜態根目錄就是專案根目錄
+dotenv.config();
 
-// === 環境變數（本機可用 .env）===
-try {
-  require("dotenv").config();
-} catch { /* no-op */ }
+// 目錄定位：本檔在 /server，靜態檔案在專案根目錄
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+const ROOT_DIR   = path.resolve(__dirname, "..");   // ← 專案根目錄
+const SERVER_DIR = __dirname;
 
 const app = express();
 app.use(express.json());
 
+// CORS（有需要再設）
 if (process.env.CORS_ORIGIN) {
   app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }));
 }
@@ -26,7 +28,7 @@ app.get("/healthz", (_req, res) => res.send("ok"));
 // 前端靜態檔案（index.html、teacher.html、JS/CSS…）
 app.use(express.static(ROOT_DIR));
 
-// === MongoDB ===
+// ====== MongoDB ======
 const mongoUri = process.env.MONGODB_URI;
 const dbName   = process.env.DB_NAME || "zhuyin";
 
@@ -59,7 +61,7 @@ function requireDB(res) {
   return true;
 }
 
-// === 一般 API ===
+// ====== 一般 API ======
 app.post("/api/upsert-student", async (req, res) => {
   if (!requireDB(res)) return;
   const { sid, name = "" } = req.body || {};
@@ -118,15 +120,15 @@ app.get("/api/classes", async (_req, res) => {
   if (!requireDB(res)) return;
   const pipeline = [
     { $project: { _id: 0, sid: 1, best: 1, class: { $substr: ["$sid", 0, 3] } } },
-    { $group: { _id: "$class", count: { $sum: 1 }, top: { $max: "$best" }, avg: { $avg: "$best" } } },
+    { $group:   { _id: "$class", count: { $sum: 1 }, top: { $max: "$best" }, avg: { $avg: "$best" } } },
     { $project: { class: "$_id", _id: 0, count: 1, top: 1, avg: { $round: ["$avg", 1] } } },
-    { $sort: { class: 1 } }
+    { $sort:    { class: 1 } }
   ];
   const data = await students.aggregate(pipeline).toArray();
   res.json({ ok: true, data });
 });
 
-// === 教師權限 ===
+// ====== 教師權限 ======
 const TEACHER_TOKEN = process.env.TEACHER_TOKEN || "1070";
 function adminAuth(req, res, next) {
   const token = req.header("x-teacher-token") || req.query.token;
@@ -135,10 +137,10 @@ function adminAuth(req, res, next) {
 }
 
 // 清除某班（刪除 or 歸零）
-app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
+app.post("/api/admin/clear-class", adminAuth, async (req, res) => {
   if (!requireDB(res)) return;
-  const mode = String(req.body?.mode || '').trim();
-  const classPrefix = String(req.body?.classPrefix || '').trim();
+  const mode = String(req.body?.mode || "").trim();
+  const classPrefix = String(req.body?.classPrefix || "").trim();
   if (!/^\d{3}$/.test(classPrefix)) {
     return res.status(400).json({ ok:false, error:"class_prefix_invalid", got: classPrefix });
   }
@@ -156,9 +158,9 @@ app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
 });
 
 // 清除全部（刪除 or 歸零）
-app.post('/api/admin/clear-all', adminAuth, async (_req, res) => {
+app.post("/api/admin/clear-all", adminAuth, async (req, res) => {
   if (!requireDB(res)) return;
-  const mode = String(_req.body?.mode || '').trim();
+  const mode = String(req.body?.mode || "").trim();
   try {
     if (mode === "delete") {
       await students.deleteMany({});
@@ -184,5 +186,6 @@ app.get(/^\/(?!api\/).*/, (_req, res) => {
   res.sendFile(path.join(ROOT_DIR, "index.html"));
 });
 
+// 啟動
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server listening on :${port}`));
