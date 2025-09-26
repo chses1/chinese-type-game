@@ -27,8 +27,21 @@ const API = {
   },
   getStudent(sid)  { return jsonFetch(`${API_BASE}/student/${sid}`); },
   getClasses()     { return jsonFetch(`${API_BASE}/classes`); },
-  adminClearClass(prefix, token){ return jsonFetch(`${API_BASE}/admin/clear-class`, { method:"POST", headers:{ "x-teacher-token": token }, body:JSON.stringify({ classPrefix: prefix }) }); },
-  adminClearAll(token){ return jsonFetch(`${API_BASE}/admin/clear-all`, { method:"POST", headers:{ "x-teacher-token": token } }); }
+  // ✅ 改成刪除整筆紀錄（含學號）
+adminClearClass(prefix, token){
+  return jsonFetch(`${API_BASE}/admin/clear-class`, {
+    method:"POST",
+    headers:{ "x-teacher-token": token },
+    body: JSON.stringify({ classPrefix: prefix, mode: "delete" })
+  });
+},
+adminClearAll(token){
+  return jsonFetch(`${API_BASE}/admin/clear-all`, {
+    method:"POST",
+    headers:{ "x-teacher-token": token },
+    body: JSON.stringify({ mode: "delete" })
+  });
+}
 };
 
 // 小工具

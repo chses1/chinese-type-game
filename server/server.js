@@ -145,7 +145,7 @@ function adminAuth(req, res, next) {
 app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
   const mode = String(req.body?.mode || '').trim();
   const classPrefix = String(req.body?.classPrefix || '').trim();
-  if (!/^[1-9]\d{2}$/.test(classPrefix)) {
+  if (!/^\d{3}$/.test(classPrefix)) {
     return res.status(400).json({ ok:false, error:"class_prefix_invalid", got: classPrefix });
   }
   try {
