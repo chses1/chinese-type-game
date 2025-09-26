@@ -1,4 +1,4 @@
-// teacher.js — 獨立教師後台頁面
+// teacher.js — 獨立教師後台頁面（覆蓋版）
 
 const API_BASE = "/api";
 const $ = id => document.getElementById(id);
@@ -22,24 +22,25 @@ const API = {
     return jsonFetch(`${API_BASE}/leaderboard?`+qs.toString());
   },
   getClasses(){ return jsonFetch(`${API_BASE}/classes`); },
+
+  // ✅ 清除改為「刪除整筆紀錄（含學號）」：傳 mode:"delete"
   adminClearClass(prefix, token){
     return jsonFetch(`${API_BASE}/admin/clear-class`, { 
       method:"POST", 
       headers:{ "x-teacher-token": token }, 
-      body: JSON.stringify({ classPrefix: prefix, mode: "delete" })   // 👈 新增刪除模式
+      body: JSON.stringify({ classPrefix: prefix, mode: "delete" })
     });
   },
   adminClearAll(token){
     return jsonFetch(`${API_BASE}/admin/clear-all`, { 
       method:"POST", 
       headers:{ "x-teacher-token": token }, 
-      body: JSON.stringify({ mode: "delete" })   // 👈 新增刪除模式
+      body: JSON.stringify({ mode: "delete" })
     });
   }
 };
 
-
-// token 快取
+// token 快取（僅做 API 權杖標頭）
 function getToken(){ return localStorage.getItem('teacher-token') || ''; }
 function setToken(v){ localStorage.setItem('teacher-token', v || ''); }
 
@@ -86,7 +87,7 @@ async function clearClass(){
   const token = getToken();
   if(!token){ alert('請先於畫面頂部解鎖（輸入教師密碼）。'); return; }
   if(!/^[1-9]\d{2}$/.test(p)){ alert('請先輸入正確的班級前三碼（100–999，例如 301）'); return; }
-  if(!confirm(`確認要清除 ${p} 班全部學生的最佳分數嗎？`)) return;
+  if(!confirm(`確認要清除 ${p} 班「全部學生紀錄（含學號）」嗎？`)) return;
   try{
     await API.adminClearClass(p, token);
     toast(`已清除 ${p} 班`);
@@ -95,21 +96,26 @@ async function clearClass(){
     alert('清除失敗：' + e.message);
   }
 }
+
 async function clearAll(){
   const token = getToken();
-  if(!token){ alert('請先輸入教師密碼並按「套用密碼」。'); return; }
-  if(!confirm('確認要清除「所有學生」的最佳分數嗎？')) return;
-  try{ await API.adminClearAll(token); toast('已清除全部學生紀錄'); await loadAllRank(); }
-  catch(e){ alert('清除失敗：' + e.message); }
+  if(!token){ alert('請先於畫面頂部解鎖（輸入教師密碼）。'); return; }
+  if(!confirm('確認要「清除全部學生紀錄（含學號）」嗎？')) return;
+  try{
+    await API.adminClearAll(token);
+    toast('已清除全部學生紀錄');
+    await loadAllRank();
+  }catch(e){
+    alert('清除失敗：' + e.message);
+  }
 }
 
 // 綁定
-$('btnLoadClasses').onclick = loadClasses;
-$('btnShowAll').onclick     = loadAllRank;
-$('btnLoadClassRank').onclick= loadClassRank;
-$('btnClearClass').onclick  = clearClass;
-$('btnClearAll').onclick    = clearAll;
-
+$('btnLoadClasses').onclick   = loadClasses;
+$('btnShowAll').onclick       = loadAllRank;
+$('btnLoadClassRank').onclick = loadClassRank;
+$('btnClearClass').onclick    = clearClass;
+$('btnClearAll').onclick      = clearAll;
 
 // 初始：若無 token 先出現鎖定層
 (function init(){
@@ -118,14 +124,14 @@ $('btnClearAll').onclick    = clearAll;
   const token = getToken();
 
   function unlock() {
-  setToken( (document.getElementById('lockPass').value || '').trim() );
-  if (!getToken()) { alert('請輸入教師密碼'); return; }
-  lock.style.display = 'none';
-  app.style.display  = '';
-  loadClasses();
-  loadAllRank();
-  toast('已解鎖');
-}
+    setToken( (document.getElementById('lockPass').value || '').trim() );
+    if (!getToken()) { alert('請輸入教師密碼'); return; }
+    lock.style.display = 'none';
+    app.style.display  = '';
+    loadClasses();
+    loadAllRank();
+    toast('已解鎖');
+  }
 
   // 綁定鎖定層按鈕
   const btnEnter = document.getElementById('lockEnter');
@@ -136,9 +142,8 @@ $('btnClearAll').onclick    = clearAll;
     lock.style.display = 'flex';
     app.style.display  = 'none';
   } else {
-    // 已有密碼 → 直接載入
+    // 已有密碼 → 直接載入（⚠ 不再引用 #tpass）
     app.style.display  = '';
-    document.getElementById('tpass').value = token;
     loadClasses(); 
     loadAllRank();
   }

@@ -141,19 +141,19 @@ function adminAuth(req, res, next) {
   next();
 }
 
-// 清除某班
+// 清除某班（刪除 or 歸零）
 app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
-  const { classPrefix, mode } = req.body;
+  const mode = String(req.body?.mode || '').trim();
+  const classPrefix = String(req.body?.classPrefix || '').trim();
   if (!/^[1-9]\d{2}$/.test(classPrefix)) {
-    return res.status(400).json({ ok:false, error:"class_prefix_invalid" });
+    return res.status(400).json({ ok:false, error:"class_prefix_invalid", got: classPrefix });
   }
   try {
+    const filter = { sid: new RegExp("^" + classPrefix) };
     if (mode === "delete") {
-      // ✅ 正確：刪掉整個班級的紀錄（包含學號）
-      await students.deleteMany({ sid: new RegExp("^" + classPrefix) });
+      await students.deleteMany(filter);          // ← 使用 students 集合
     } else {
-      // ✅ 正確：只把分數清零
-      await students.updateMany({ sid: new RegExp("^" + classPrefix) }, { $set: { best: 0 } });
+      await students.updateMany(filter, { $set: { best: 0 } });
     }
     res.json({ ok:true });
   } catch (e) {
@@ -161,12 +161,11 @@ app.post('/api/admin/clear-class', adminAuth, async (req, res) => {
   }
 });
 
-// 清除全部
+// 清除全部（刪除 or 歸零）
 app.post('/api/admin/clear-all', adminAuth, async (req, res) => {
-  const { mode } = req.body;
+  const mode = String(req.body?.mode || '').trim();
   try {
     if (mode === "delete") {
-      // ✅ 改成 students
       await students.deleteMany({});
     } else {
       await students.updateMany({}, { $set: { best: 0 } });
