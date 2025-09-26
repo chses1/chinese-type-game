@@ -58,12 +58,14 @@ const SHENGMU=new Set(['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','�
 const MEDIAL =new Set(['ㄧ','ㄨ','ㄩ']);
 const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':'yunmu');
 
-// 等級
-let level=1;
-const ACC_THRESHOLD=0.8;
-const LEVELS=[{lpm:10,duration:60},{lpm:15,duration:60},{lpm:20,duration:60}];
-const spawnInterval = () => Math.max(320, Math.round(60000/(LEVELS[level-1]||LEVELS.at(-1)).lpm));
+// === 等級相關（保留原本 LEVELS 出怪更快，再新增墜落加速） ===
+let level = 1;
+const ACC_THRESHOLD = 0.8;
+const LEVELS = [{ lpm:10, duration:60 }, { lpm:15, duration:60 }, { lpm:20, duration:60 }];
+const spawnInterval = () => Math.max(320, Math.round(60000 / (LEVELS[level-1] || LEVELS.at(-1)).lpm));
 
+// NEW: 不同等級的墜落速度倍率（1, 1.2, 1.4, ... 可自行調）
+const levelFallFactor = () => 1 + 0.1 * (level - 1);
 // Canvas
 const canvas=$('gameCanvas'); const ctx=canvas.getContext('2d');
 let W,H;
@@ -131,8 +133,8 @@ function draw(){
 
 // 反應時間 → 加分規則（毫秒）
 function calcPoints(rtMs){
-  if (rtMs <= 800)  return 3;   // 很快
-  if (rtMs <= 1500) return 2;   // 普通
+  if (rtMs <= 1500) return 3;   // 很快
+  if (rtMs <= 2500) return 2;   // 普通
   return 1;                     // 慢一點也給分
 }
 
@@ -157,18 +159,20 @@ function pressKey(ch){
   }
 }
 
+// CHG: 在 step() 裡面把墜落速度乘上等級倍率
 function step(){
   if(running){
-    spawnTimer+=16;
-    if(spawnTimer>spawnInterval()){ spawn(); spawnTimer=0; }
-    meteors.forEach(m=> m.y += m.speed*2);
+    spawnTimer += 16;
+    if (spawnTimer > spawnInterval()) { spawn(); spawnTimer = 0; }
+    meteors.forEach(m => m.y += m.speed * 2 * levelFallFactor());  // CHG ✨
     for(let i=meteors.length-1;i>=0;i--){
-      if(meteors[i].y>H-40){ meteors.splice(i,1); score=Math.max(0,score-1); wrong++; }
+      if(meteors[i].y > H-40){ meteors.splice(i,1); score = Math.max(0, score-1); wrong++; }
     }
     draw();
   }
   requestAnimationFrame(step);
 }
+
 
 function startGame(){ if(!me.sid){ toast('請先登入'); return; } running=true; ticker(); }
 function pauseGame(){ running=false; }
@@ -177,42 +181,61 @@ function toggleRun(){ running?pauseGame():startGame(); }
 let timerId=null;
 function ticker(){ clearInterval(timerId); timerId=setInterval(()=>{ if(!running) return; timeLeft--; setTime(); if(timeLeft<=0) endGame(); },1000); }
 
-// 成績視窗
+// CHG: 動態控制結果視窗按鈕
 function showResult({correct, wrong, acc, speed, passed}){
   $('resCorrect').textContent = correct;
   $('resWrong').textContent   = wrong;
   $('resAcc').textContent     = Math.round(acc*100) + '%';
   $('resSpeed').textContent   = Math.round(speed);
   $('resPromo').textContent   = passed ? '✅ 達標' : '❌ 未達標';
-  $('resultBox').style.display='flex';
+
+  const btn = $('resultPrimaryBtn');               // NEW
+  btn.replaceWith(btn.cloneNode(true));            // 解除舊監聽（保守作法）
+  const freshBtn = $('resultPrimaryBtn');
+
+  if (passed) {
+    freshBtn.textContent = '挑戰下一關';           // NEW
+    freshBtn.onclick = () => {
+      closeResult();                               // 關閉視窗
+      // 直接開始下一關（分數延續；endGame 已把 timeLeft 重設並清本關統計）
+      startGame();
+    };
+  } else {
+    freshBtn.textContent = '重新開始';             // NEW
+    freshBtn.onclick = () => { closeResult(); restart(); };
+  }
+
+  $('resultBox').style.display = 'flex';
 }
+
 function closeResult(){ $('resultBox').style.display='none'; }
 
+// CHG: endGame() — 仍保持「通關升級但不歸零」
 async function endGame(){
-  running=false; clearInterval(timerId);
+  running = false; clearInterval(timerId);
 
-  const dur=(LEVELS[level-1]?.duration)||60;            // 本關設定秒數
+  const dur = (LEVELS[level-1]?.duration) || 60;
   const elapsed = dur - Math.max(0, timeLeft);
-  const minutes = Math.max(1, elapsed)/60;
-  const acc = (correct+wrong) ? (correct/(correct+wrong)) : 0;
-  const speed = correct / minutes;                       // 字/分
+  const minutes = Math.max(1, elapsed) / 60;
+  const acc = (correct + wrong) ? (correct / (correct + wrong)) : 0;
+  const speed = correct / minutes;
   const passed = acc >= ACC_THRESHOLD;
 
-  // 顯示成績視窗
+  // 顯示成績（會依 passed 替換按鈕與行為）
   showResult({ correct, wrong, acc, speed, passed });
 
-  // 更新最佳（用「累計分數」）
+  // 更新最佳使用「累計分數」
   if (me.sid) await submitBest(me.sid, score);
   await setBest();
 
-  // 下一關的準備：**不清空 score**，只重置回合統計
-  if (passed && level < LEVELS.length) {
-    level++;
-  }
-  // 下一輪或重玩時的重置（不清空分數）
+  // 若達標 → 進下一級（加快出怪＆墜落），分數延續
+  if (passed && level < LEVELS.length) level++;
+
+  // 準備下一輪：只重置本關統計與時間、清場，不動 score
   correct = 0; wrong = 0; meteors.length = 0;
-  timeLeft = (LEVELS[level-1]?.duration)||60; setTime(); draw();
+  timeLeft = (LEVELS[level-1]?.duration) || 60; setTime(); draw();
 }
+
 
 function restart(){
   // 重新開始整個流程：歸零分數與等級
@@ -253,7 +276,7 @@ if($('btnRestartGame')) $('btnRestartGame').onclick=()=>{ closeLeader(); restart
 
 if ($('go')) $('go').onclick = async () => {
   let sid = $('sid').value.trim().replace(/\D/g,'');
-  if (!/^\d{5}$/.test(sid)) { alert('請輸入5位數座號'); return; }
+  if (!/^\d{5}$/.test(sid)) { alert('請輸入5位數學號'); return; }
   me.sid = sid; me.name = '';
   try { await API.upsertStudent({ sid }); } catch (e) { alert('登入失敗：' + e.message); return; }
   setUserChip(); await setBest();
