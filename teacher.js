@@ -52,7 +52,7 @@ async function loadClasses(){
       const btn=document.createElement('button');
       btn.className='tag';
       btn.textContent=`${c.class}（${c.count}人，Top ${c.top}，Avg ${c.avg}）`;
-            btn.onclick=()=>{
+      btn.onclick=()=>{
         const ipt = $('classPrefix');
         if (!ipt) return;
         ipt.value = c.class;
