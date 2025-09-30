@@ -1,142 +1,98 @@
-// teacher.js — 獨立教師後台頁面（覆蓋版）
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>教師後台｜地球保衛戰</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body{ background: radial-gradient(1200px 600px at 60% -10%, #0f274f 0%, #08182e 60%, #061225 100%) fixed; }
+    .container{ max-width: 1040px; margin: 24px auto; padding: 0 16px; }
+    .card{ background: rgba(12,30,66,.88); backdrop-filter: blur(8px);
+           border: 1px solid rgba(255,255,255,.15); border-radius: 16px; padding: 16px; }
+    h1{ margin: 0 0 12px; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:8px; }
+    .row > *{ flex:1; min-width: 200px; }
+    table{ width:100%; border-collapse: collapse; background: rgba(8,22,48,.9); border-radius: 12px; overflow:hidden; }
+    th,td{ padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.08); }
+    th{ opacity:.85; text-align:left; }
+    .toolbar{ display:flex; gap:10px; flex-wrap:wrap; }
+    .toolbar .tag, .toolbar .primary{ flex:1; min-width: 160px; }
+    .danger{ border-color:#ff3b3b !important; color:#ffbdbd !important; }
+    .warning{ border-color:#ff6b6b !important; color:#ffb3b3 !important; }
+    header.top{ position:sticky; top:0; z-index:2; background:linear-gradient(180deg,rgba(0,0,0,.35),transparent); padding:8px 0; }
+    .muted{ opacity:.75; font-size:.9rem; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="container" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <h1 style="flex:1">教師後台</h1>
+      <a href="/" class="tag">⬅️ 回到遊戲</a>
+      <button id="btnRelock" class="ghost">🔒 重新輸入教師密碼</button>
+    </div>
+  </header>
 
-const API_BASE = "/api";
-const $ = id => document.getElementById(id);
-const toast = msg => { const t=$('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
+  <!-- 🔐 鎖定層 -->
+  <div id="lock" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:3">
+    <div class="card" style="width:min(420px,92vw);text-align:center">
+      <h2 style="margin:.2rem 0 1rem">輸入教師密碼</h2>
+      <input id="lockPass" type="password" placeholder="教師密碼" />
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="lockEnter" class="primary">解鎖進入</button>
+        <a href="/" class="ghost">返回首頁</a>
+      </div>
+      <div class="muted" style="margin-top:8px">密碼僅保存在本機 <code>localStorage</code> 以作為 API 權杖。</div>
+    </div>
+  </div>
 
-function getToken(){ return localStorage.getItem('teacher-token') || ''; }
-function setToken(v){ localStorage.setItem('teacher-token', v || ''); }
+  <!-- ✅ 主介面：整個包在 #app 裡，未解鎖前隱藏 -->
+  <main id="app" class="container" style="display:none">
+    <div class="card">
+      <div class="toolbar">
+        <button id="btnLoadClasses" class="tag">重新載入班級清單</button>
+        <button id="btnShowAll" class="tag">顯示全部排行</button>
+      </div>
 
-function showLock(){
-  const lock = $('lock'), app = $('app');
-  if (lock && app){ lock.style.display = 'flex'; app.style.display = 'none'; }
-}
-function hideLock(){
-  const lock = $('lock'), app = $('app');
-  if (lock && app){ lock.style.display = 'none'; app.style.display = ''; }
-}
+      <div class="row">
+        <div>
+          <label>班級前三碼（例如 301）</label>
+          <input id="classPrefix" placeholder="301" maxlength="3" inputmode="numeric" required pattern="\d{3}" />
+        </div>
+        <div>
+          <label>排行筆數</label>
+          <select id="lbLimit"><option>10</option><option>20</option><option>50</option><option>100</option></select>
+        </div>
+        <div style="flex:0 0 auto">
+          <button id="btnLoadClassRank" class="primary">載入班內排行</button>
+        </div>
+      </div>
 
-async function jsonFetch(path, options = {}) {
-  const res = await fetch(path, {
-    headers: { "Content-Type":"application/json", ...(options.headers || {}) },
-    ...options
-  });
-  if (!res.ok) {
-    // 🔒 若未授權，清 token、顯示鎖
-    if (res.status === 401) { setToken(''); showLock(); }
-    let d=""; try { d = JSON.stringify(await res.json()); } catch {}
-    throw new Error(`HTTP ${res.status} ${res.statusText} ${d}`);
-  }
-  return res.json();
-}
+      <div class="row">
+        <div class="muted" style="flex:1 1 auto">
+          先於上方「輸入教師密碼」解鎖後再操作。清除功能僅在已解鎖狀態下啟用。
+        </div>
+        <div style="flex:0 0 auto; display:flex; gap:10px; align-items:flex-end;">
+          <button id="btnClearClass" class="ghost warning">🧹 清除此班級紀錄</button>
+          <button id="btnClearAll" class="ghost danger">🗑️ 清除全部學生紀錄</button>
+        </div>
+      </div>
 
-const API = {
-  leaderboard(limit=10, classPrefix=""){
-    const qs=new URLSearchParams({limit}); if(classPrefix) qs.set("classPrefix", classPrefix);
-    return jsonFetch(`${API_BASE}/leaderboard?`+qs.toString());
-  },
-  getClasses(){ return jsonFetch(`${API_BASE}/classes`); },
-  adminClearClass(prefix, token){
-    return jsonFetch(`${API_BASE}/admin/clear-class`, { 
-      method:"POST", 
-      headers:{ "x-teacher-token": token }, 
-      body: JSON.stringify({ classPrefix: prefix, mode: "delete" })
-    });
-  },
-  adminClearAll(token){
-    return jsonFetch(`${API_BASE}/admin/clear-all`, { 
-      method:"POST", 
-      headers:{ "x-teacher-token": token }, 
-      body: JSON.stringify({ mode: "delete" })
-    });
-  }
-};
+      <div style="margin-top:12px">
+        <table>
+          <thead><tr><th style="width:64px">#</th><th>學號</th><th style="width:120px">最佳</th></tr></thead>
+          <tbody id="teacherLbBody"><tr><td colspan="3">尚未載入資料</td></tr></tbody>
+        </table>
+      </div>
 
-async function loadClasses(){
-  try{
-    const resp = await API.getClasses();
-    const box = $('classList'); box.innerHTML = "";
-    resp.data.forEach(c=>{
-      const btn=document.createElement('button');
-      btn.className='tag';
-      btn.textContent=`${c.class}（${c.count}人，Top ${c.top}，Avg ${c.avg}）`;
-      btn.onclick=()=>{ $('classPrefix').value=c.class; $('classPrefix').dispatchEvent(new Event('input',{bubbles:true})); loadClassRank(); };
-      box.appendChild(btn);
-    });
-  }catch(e){ toast('載入班級清單失敗'); console.warn(e); }
-}
+      <div style="margin-top:10px">
+        <h3 style="margin:.6rem 0 .2rem 0;font-size:14px;opacity:.9">班級清單</h3>
+        <div id="classList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+    </div>
+  </main>
 
-async function loadAllRank(){
-  const limit = Number($('lbLimit').value || 20);
-  const tb = $('teacherLbBody'); tb.innerHTML = "";
-  try {
-    const resp = await API.leaderboard(limit);
-    tb.innerHTML = resp.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
-  } catch (e) {
-    tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
-  }
-}
-
-async function loadClassRank(){
-  const p = $('classPrefix').value.trim();
-  if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼（三碼，允許 0 開頭）'); return; }
-  const limit = Number($('lbLimit').value || 20);
-  const tb = $('teacherLbBody'); tb.innerHTML = "";
-  try {
-    const resp = await API.leaderboard(limit, p);
-    tb.innerHTML = resp.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
-  } catch (e) {
-    tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
-  }
-}
-
-async function clearClass(){
-  const p = $('classPrefix').value.trim();
-  const token = getToken();
-  if(!token){ showLock(); alert('請先輸入教師密碼。'); return; }
-  if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼（三碼，允許 0 開頭）'); return; }
-  if(!confirm(`確認要清除 ${p} 班「全部學生紀錄（含學號）」嗎？`)) return;
-  await API.adminClearClass(p, token);
-  toast(`已清除 ${p} 班`);
-  await loadClassRank();
-}
-
-async function clearAll(){
-  const token = getToken();
-  if(!token){ showLock(); alert('請先輸入教師密碼。'); return; }
-  if(!confirm('確認要「清除全部學生紀錄（含學號）」嗎？')) return;
-  await API.adminClearAll(token);
-  toast('已清除全部學生紀錄');
-  await loadAllRank();
-}
-
-// 綁定
-$('btnLoadClasses').onclick   = loadClasses;
-$('btnShowAll').onclick       = loadAllRank;
-$('btnLoadClassRank').onclick = loadClassRank;
-$('btnClearClass').onclick    = clearClass;
-$('btnClearAll').onclick      = clearAll;
-
-// 🔒 鎖定流程
-(function init(){
-  // 清除鍵與輸入鎖
-  const ipt = $('classPrefix');
-  const btn = $('btnClearClass');
-  const toggle = () => { if(btn) btn.disabled = !/^\d{3}$/.test((ipt.value||'').trim()); };
-  ipt.addEventListener('input', toggle); toggle();
-
-  $('lockEnter').onclick = () => {
-    const v = ($('lockPass').value || '').trim();
-    if (!v) return alert('請輸入教師密碼');
-    setToken(v);
-    hideLock();
-    loadClasses(); loadAllRank();
-    toast('已解鎖');
-  };
-
-  $('btnRelock').onclick = () => { setToken(''); showLock(); $('lockPass').value=''; };
-
-  // 啟動時決定是否鎖住
-  if (getToken()) { hideLock(); loadClasses(); loadAllRank(); }
-  else { showLock(); }
-})();
+  <div class="toast" id="toast"></div>
+  <script src="teacher.js"></script>
+</body>
+</html>
