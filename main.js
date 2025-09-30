@@ -291,3 +291,112 @@ document.addEventListener('DOMContentLoaded', () => {
   // 初始化
   buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setBest(); draw(); requestAnimationFrame(step);
 });
+
+/* ===== Admin Clear Utilities (for game page) =====
+   作用：
+   - 與 teacher.js 相同：固定帶 Content-Type 與 x-teacher-token
+   - 401 會自動清掉 token，提醒重新輸入
+   - 400 會把後端的錯誤訊息完整 alert 出來（便於查欄位/規則）
+   用法：
+   - window.clearClassFromGame('101')   // 清 101 班（含學號）
+   - window.clearAllFromGame()          // 清全部（含學號）
+   - 若頁面上有 #btnClearClass / #btnClearAll，會自動綁定
+*/
+
+function getTeacherToken() {
+  return localStorage.getItem('teacher_token') || '';
+}
+
+function showTeacherLock() {
+  // 遊戲頁通常沒有鎖定層，這裡保留掛鉤避免報錯
+  if (typeof showLock === 'function') showLock();
+}
+
+async function jsonFetch(url, opts = {}) {
+  const res = await fetch(url, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) {
+    let msg = '';
+    try { msg = await res.text(); } catch (e) {}
+    if (res.status === 401) {
+      localStorage.removeItem('teacher_token');
+      showTeacherLock();
+    }
+    throw new Error(`${res.status} ${res.statusText}${msg ? ' - ' + msg : ''}`);
+  }
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('application/json') ? res.json() : res.text();
+}
+
+const AdminAPI = {
+  clearClass: (classPrefix, token) =>
+    jsonFetch('/api/admin/clear-class', {
+      method: 'POST',
+      headers: { 'x-teacher-token': token },
+      body: JSON.stringify({ classPrefix, mode: 'delete' })
+    }),
+  clearAll: (token) =>
+    jsonFetch('/api/admin/clear-all', {
+      method: 'POST',
+      headers: { 'x-teacher-token': token },
+      body: JSON.stringify({ mode: 'delete' })
+    })
+};
+
+// 導出給 console 或其他模組呼叫
+window.clearClassFromGame = async function (prefix) {
+  const p = String(prefix || '').trim();
+  const token = getTeacherToken();
+  if (!token) { showTeacherLock(); alert('請先在教師後台輸入教師密碼。'); return; }
+  if (!/^\d{3}$/.test(p)) { alert('請輸入班級前三碼（三碼，允許 0 開頭）'); return; }
+  if (!confirm(`確認要清除 ${p} 班全部學生紀錄（含學號）？`)) return;
+
+  try {
+    await AdminAPI.clearClass(p, token);
+    alert(`已清除 ${p} 班紀錄`);
+    // 若遊戲頁也有排行榜刷新函式，可在此呼叫
+    if (typeof refreshLeaderboard === 'function') refreshLeaderboard();
+  } catch (e) {
+    if (String(e.message).startsWith('401')) {
+      alert('教師密碼錯誤或已過期，請回教師後台重新輸入。');
+    } else {
+      alert('清除失敗：' + e.message); // 會包含 400 的詳細原因
+    }
+  }
+};
+
+window.clearAllFromGame = async function () {
+  const token = getTeacherToken();
+  if (!token) { showTeacherLock(); alert('請先在教師後台輸入教師密碼。'); return; }
+  if (!confirm('確認要「清除全部學生紀錄（含學號）」嗎？')) return;
+
+  try {
+    await AdminAPI.clearAll(token);
+    alert('已清除全部學生紀錄');
+    if (typeof refreshLeaderboard === 'function') refreshLeaderboard();
+  } catch (e) {
+    if (String(e.message).startsWith('401')) {
+      alert('教師密碼錯誤或已過期，請回教師後台重新輸入。');
+    } else {
+      alert('清除失敗：' + e.message);
+    }
+  }
+};
+
+// 如果頁面上剛好有按鈕，幫你自動綁定（沒有也不會報錯）
+(function autoBindAdminButtons(){
+  const btnC = document.getElementById('btnClearClass');
+  const btnA = document.getElementById('btnClearAll');
+  const inputP = document.getElementById('classPrefix');
+  if (btnC && inputP) {
+    btnC.addEventListener('click', () => window.clearClassFromGame(inputP.value));
+  }
+  if (btnA) {
+    btnA.addEventListener('click', () => window.clearAllFromGame());
+  }
+})();
