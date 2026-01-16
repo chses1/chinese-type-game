@@ -67,11 +67,12 @@ header .chip {
 /* 一列就是一行鍵盤，不換行；按鍵平均分配寬度 */
 .row{
   display:flex;
-  flex-wrap:nowrap;           /* 關鍵：避免自動掉到下一行 */
-  justify-content:space-between;
+  flex-wrap:nowrap;
+  justify-content:stretch;   /* ✅ 交給 flex 平均分配 */
   gap:8px;
-  margin:8px auto
+  margin:8px auto;
 }
+
 
 /* 按鍵等寬、等高；在不同鍵數的列仍可平均分配 */
 .key{
@@ -132,6 +133,12 @@ header .chip {
 .key.shengmu{background:#133468;border-color:#2b8cff;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 0 0 2px rgba(43,140,255,.25)}
 .key.medial{background:#154a3a;border-color:#23d39b;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 0 0 2px rgba(35,211,155,.25)}
 .key.yunmu{background:#4a2b3c;border-color:#ff8cc8;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 0 0 2px rgba(255,140,200,.25)}
+/* 聲調鍵（ˇˋˊ˙）：視覺上跟聲母同一區，避免學生困惑 */
+.key.tone{
+  background:#133468;
+  border-color:#2b8cff;
+  box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 0 0 2px rgba(43,140,255,.25)
+}
 
 .legend .dot{display:inline-block;width:.9em;height:.9em;border-radius:50%;margin-right:.35em;vertical-align:-.12em}
 .legend .dot.sm{background:#2b8cff}
@@ -154,6 +161,9 @@ header .chip {
 #card{width:min(440px,94vw);background:#0c2a57;border:1px solid rgba(255,255,255,.12);padding:18px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
 label{display:block;font-size:14px;margin:4px 0 6px}
 input,button,select{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#0b2148;color:#fff}
+/* ✅ 修正：鍵盤按鍵不要吃到全域 button 的 width/padding，避免大小不一、排列不齊 */
+#kbd .key{ width:auto; padding:0; }
+
 button.primary{background:linear-gradient(180deg,#2f7cff,#1b5bd1);border:none;font-weight:700}
 button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
 .rowBtns{display:flex;gap:8px;margin-top:10px}
