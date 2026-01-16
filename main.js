@@ -105,6 +105,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function submitBest(sid, score){
     try { await API.updateBest({ sid, score }); } catch(e){ console.warn('submitBest fail', e); }
   }
+// 🔑 記錄每個注音鍵在 canvas 中對應的位置
+const keyPositions = {};
 
   function buildKeyboard(){
     const rows=[
@@ -121,6 +123,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const b=document.createElement('button');
         b.className='key '+(ZHUYIN.includes(ch)?keyClass(ch):'');
         b.textContent=ch; b.onclick=()=>pressKey(ch);
+        // 記錄鍵盤按鍵在 canvas 座標中的位置
+requestAnimationFrame(() => {
+  const rect = b.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+
+  const scaleX = canvas.width / canvasRect.width;
+  const scaleY = canvas.height / canvasRect.height;
+
+  keyPositions[ch] = {
+    x: (rect.left + rect.width / 2 - canvasRect.left) * scaleX,
+    y: (rect.top - canvasRect.top) * scaleY   // 🔥 鍵的正上方
+  };
+});
+
         row.appendChild(b);
       });
       kbd.appendChild(row);
@@ -128,29 +144,48 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function applyKbdPref(){ const k=$('kbd'); if(!k) return; const compact=localStorage.getItem('kbd-compact')==='1'; k.classList.toggle('compact',compact); }
 
-  function spawn(){
+function spawn(){
+  // 隕石顯示的注音可以隨機
   const label = ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
 
-  // ✅ 出生點：右上方（畫面外）
-  const x = W + 80;                         // 右邊畫面外
-  const y = -60 + Math.random() * (H * 0.25); // 上方 1/4 區域隨機
+  // ✅ 目標永遠固定：ㄅ鍵
+  const targetKey = 'ㄅ';
 
-  // ✅ 基礎速度（刻意放慢，增加反應時間）
-  const base = 0.9 + Math.random() * 1.3;  // 約 0.9 ~ 2.2
+  // 如果ㄅ鍵位置還沒抓到（剛載入時可能會發生），先不生
+  if (!keyPositions[targetKey]) return;
 
-  // ✅ 斜向移動：右上 → 左下
-  const vx = -(base * 1.8); // 往左
-  const vy =  (base * 1.2); // 往下
+  const target = keyPositions[targetKey];
+
+  // ✅ 出生點：右上角畫面外（你也可以改成更靠右/更靠上）
+  const startX = W + 100;
+  const startY = -80;
+
+  // ✅ 目標點：ㄅ鍵的正上方（往上抬一點比較自然）
+  const targetX = target.x;
+  const targetY = target.y - 120;
+
+  // 計算方向向量（讓隕石朝目標飛）
+  const dx = targetX - startX;
+  const dy = targetY - startY;
+  const len = Math.hypot(dx, dy) || 1;
+
+  // ✅ 飛行速度：建議先用 2.0~2.6（數字越小越慢、越好打）
+  const speed = 2.2;
+
+  const vx = (dx / len) * speed;
+  const vy = (dy / len) * speed;
 
   meteors.push({
-    x,
-    y,
+    x: startX,
+    y: startY,
     vx,
     vy,
     label,
     born: performance.now()
   });
 }
+
+
 
 
   function drawBackground(){
