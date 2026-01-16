@@ -52,11 +52,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!canvas) return;
 
   const ctx = canvas.getContext('2d');
-  const meteorImg = new Image();
-  // 若 Q.png 放在根目錄，這樣抓；若你有 /img/Q.png 也可換路徑
-  meteorImg.src = "Q.png";
-  let imageReady=false;
-  meteorImg.onload=()=> imageReady=true;
+    const meteorImg = new Image();
+
+  // ✅ 隕石圖請放在 /img/Q.png（建議與 earth_bg.png 同一層）
+  meteorImg.src = "img/Q.png";
+
+  let imageReady = false;
+  meteorImg.onload = () => imageReady = true;
+
+  // ✅ 加上 onerror，方便你在 Console 一眼看出是不是路徑問題
+  meteorImg.onerror = () => {
+    console.warn("❌ 隕石圖片載入失敗：", meteorImg.src);
+    imageReady = false;
+  };
+
 
   const ZHUYIN=['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ','ㄚ','ㄛ','ㄜ','ㄝ','ㄞ','ㄟ','ㄠ','ㄡ','ㄢ','ㄣ','ㄤ','ㄥ','ㄦ'];
   const SHENGMU=new Set(['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ']);
