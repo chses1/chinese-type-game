@@ -129,10 +129,23 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyKbdPref(){ const k=$('kbd'); if(!k) return; const compact=localStorage.getItem('kbd-compact')==='1'; k.classList.toggle('compact',compact); }
 
   function spawn(){
-    const label=ZHUYIN[Math.floor(Math.random()*ZHUYIN.length)];
-    const x=40+Math.random()*(W-80); const speed=1.5+Math.random()*2.5;
-    meteors.push({x, y:-40, speed, label, born: performance.now()});
-  }
+  const label = ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
+
+  // ✅ 出生點：右上方（x 在畫面右側外面，y 在上方附近）
+  const x = W + 80;
+  const y = -60 + Math.random() * (H * 0.25);
+
+  // ✅ 速度：故意放慢一些，讓學生反應時間變長
+  // 你可以用這裡微調：數字越小越慢
+  const base = 0.9 + Math.random() * 1.3; // 約 0.9 ~ 2.2
+
+  // ✅ 斜向速度：往左（負 vx）+ 往下（正 vy）
+  const vx = -(base * 1.8);
+  const vy =  (base * 1.2);
+
+  meteors.push({ x, y, vx, vy, label, born: performance.now() });
+}
+
   function drawBackground(){
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle='rgba(255,255,255,.8)';
@@ -185,10 +198,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if(running){
       spawnTimer += 16;
       if (spawnTimer > spawnInterval()) { spawn(); spawnTimer = 0; }
-      meteors.forEach(m => m.y += m.speed * 2 * (1 + 0.1 * (level - 1)));
-      for(let i=meteors.length-1;i>=0;i--){
-        if(meteors[i].y > H-40){ meteors.splice(i,1); score = Math.max(0, score-1); wrong++; }
-      }
+      const f = 1 + 0.08 * (level - 1); // ✅ 等級加速，但不要太兇（0.08 比 0.1 更溫和）
+meteors.forEach(m => {
+  m.x += m.vx * 2 * f;
+  m.y += m.vy * 2 * f;
+});
+
+      for (let i = meteors.length - 1; i >= 0; i--) {
+  const m = meteors[i];
+  const outBottom = m.y > H + 60;
+  const outLeft   = m.x < -80;
+
+  if (outBottom || outLeft) {
+    meteors.splice(i, 1);
+    score = Math.max(0, score - 1);
+    wrong++;
+  }
+}
+
       draw();
     }
     requestAnimationFrame(step);
