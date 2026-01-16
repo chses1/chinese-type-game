@@ -109,39 +109,68 @@ document.addEventListener('DOMContentLoaded', () => {
 const keyPositions = {};
 
   function buildKeyboard(){
-    const rows=[
-      ['ㄅ','ㄉ','','','ㄓ','','','ㄚ','ㄞ','ㄢ','ㄦ'],
-      ['ㄆ','ㄊ','ㄍ','ㄐ','ㄔ','ㄗ','ㄧ','ㄛ','ㄟ','ㄣ',''],
-      ['ㄇ','ㄋ','ㄎ','ㄑ','ㄕ','ㄘ','ㄨ','ㄜ','ㄠ','ㄤ',''],
-      ['ㄈ','ㄌ','ㄏ','ㄒ','ㄖ','ㄙ','ㄩ','ㄝ','ㄡ','ㄥ','']
-    ];
-    const kbd=$('kbd'); if(!kbd) return;
-    kbd.innerHTML='';
-    rows.forEach(r=>{
-      const row=document.createElement('div'); row.className='row';
-      r.forEach(ch=>{
-        const b=document.createElement('button');
+  // ✅ 右側控制鍵：放在 ㄦ 鍵的下方
+  // - ㄦ 在第 1 列最後一格
+  // - 第 2 列最後一格放「暫停」
+  // - 第 3 列最後一格放「結束」
+  const rows=[
+    ['ㄅ','ㄉ',null,null,'ㄓ',null,null,'ㄚ','ㄞ','ㄢ','ㄦ'],
+    ['ㄆ','ㄊ','ㄍ','ㄐ','ㄔ','ㄗ','ㄧ','ㄛ','ㄟ','ㄣ','__PAUSE__'],
+    ['ㄇ','ㄋ','ㄎ','ㄑ','ㄕ','ㄘ','ㄨ','ㄜ','ㄠ','ㄤ','__END__'],
+    ['ㄈ','ㄌ','ㄏ','ㄒ','ㄖ','ㄙ','ㄩ','ㄝ','ㄡ','ㄥ',null]
+  ];
+
+  const kbd=$('kbd'); if(!kbd) return;
+  kbd.innerHTML='';
+  rows.forEach(r=>{
+    const row=document.createElement('div'); row.className='row';
+    r.forEach(ch=>{
+      // 空格：只佔位置，不可點擊
+      if (ch == null) {
+        const spacer = document.createElement('div');
+        spacer.className = 'key spacer';
+        spacer.textContent = '';
+        row.appendChild(spacer);
+        return;
+      }
+
+      const b=document.createElement('button');
+
+      // 控制鍵
+      if (ch === '__PAUSE__') {
+        b.className = 'key control';
+        b.textContent = '⏸ 暫停';
+        b.onclick = () => toggleRun();
+      } else if (ch === '__END__') {
+        b.className = 'key control';
+        b.textContent = '⏹ 結束';
+        b.onclick = () => endAndShowLeader();
+      } else {
+        // 一般注音鍵
         b.className='key '+(ZHUYIN.includes(ch)?keyClass(ch):'');
-        b.textContent=ch; b.onclick=()=>pressKey(ch);
-        // 記錄鍵盤按鍵在 canvas 座標中的位置
-requestAnimationFrame(() => {
-  const rect = b.getBoundingClientRect();
-  const canvasRect = canvas.getBoundingClientRect();
+        b.textContent=ch;
+        b.onclick=()=>pressKey(ch);
+      }
 
-  const scaleX = canvas.width / canvasRect.width;
-  const scaleY = canvas.height / canvasRect.height;
+      // 記錄鍵盤按鍵在 canvas 座標中的位置（給隕石瞄準用）
+      requestAnimationFrame(() => {
+        const rect = b.getBoundingClientRect();
+        const canvasRect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / canvasRect.width;
+        const scaleY = canvas.height / canvasRect.height;
 
-  keyPositions[ch] = {
-    x: (rect.left + rect.width / 2 - canvasRect.left) * scaleX,
-    y: (rect.top - canvasRect.top) * scaleY   // 🔥 鍵的正上方
-  };
-});
-
-        row.appendChild(b);
+        keyPositions[ch] = {
+          x: (rect.left + rect.width / 2 - canvasRect.left) * scaleX,
+          y: (rect.top - canvasRect.top) * scaleY
+        };
       });
-      kbd.appendChild(row);
+
+      row.appendChild(b);
     });
-  }
+    kbd.appendChild(row);
+  });
+}
+
   function applyKbdPref(){ const k=$('kbd'); if(!k) return; const compact=localStorage.getItem('kbd-compact')==='1'; k.classList.toggle('compact',compact); }
 
 function spawn(){
@@ -266,6 +295,24 @@ meteors.forEach(m => {
   function startGame(){ if(!me.sid){ toast && toast('請先登入'); return; } running=true; ticker(); }
   function pauseGame(){ running=false; }
   function toggleRun(){ running?pauseGame():startGame(); }
+// ✅ 結束：顯示排行榜後「自動重新開始」
+// 做法：先停下遊戲 → 送出最佳分數 → 打開排行榜 → 當排行榜關閉時重開
+let leaderAutoRestart = false;
+
+async function endAndShowLeader(){
+  if (!me.sid) { toast && toast('請先登入'); return; }
+  running = false;
+  clearInterval(timerId);
+  leaderAutoRestart = true;
+
+  // 結束時也送出 best（避免學生按結束就沒記到）
+  try { await submitBest(me.sid, score); } catch {}
+  await setBest();
+
+  // 不顯示「打字結果」彈窗，直接看排行榜
+  closeResult();
+  await openLeader();
+}
 
   let timerId=null;
   function ticker(){ clearInterval(timerId); timerId=setInterval(()=>{ if(!running) return; timeLeft--; setTime(); if(timeLeft<=0) endGame(); },1000); }
@@ -321,6 +368,9 @@ meteors.forEach(m => {
 
   // 排行榜（教師按鈕在遊戲頁也可用）
   async function openLeader() {
+    const closeBtn = $('btnCloseLeader');
+if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始' : '關閉';
+
     const tb = $('leaderBody'); if(!tb) return;
     try {
       const data = await API.leaderboard(50);
@@ -330,7 +380,16 @@ meteors.forEach(m => {
     }
     const panel = $('leader'); if(panel){ panel.classList.add('show'); panel.removeAttribute('hidden'); }
   }
-  function closeLeader(){ const p=$('leader'); if(p){ p.classList.remove('show'); p.setAttribute('hidden',''); } }
+  function closeLeader(){ 
+    const p=$('leader'); 
+    if(p){ p.classList.remove('show'); 
+      p.setAttribute('hidden',''); 
+    } 
+  if (leaderAutoRestart) {
+  leaderAutoRestart = false;
+  restart();
+}
+}
 
   async function loadClasses(){ try{ const resp=await API.getClasses(); const box=$('classList'); if(!box) return; box.innerHTML=""; resp.data.forEach(c=>{ const btn=document.createElement('button'); btn.className='tag'; btn.textContent=`${c.class}（${c.count}人，Top ${c.top}，Avg ${c.avg}）`; btn.onclick=()=>{ const cp=$('classPrefix'); if(cp){ cp.value=c.class; loadClassRank(); } }; box.appendChild(btn); }); }catch(e){ toast && toast('載入班級清單失敗'); } }
   async function loadAllRank(){ const limit=Number(($('lbLimit')?.value)||20); const tb=$('teacherLbBody'); if(!tb) return; tb.innerHTML=""; try{ const resp=await API.leaderboard(limit); tb.innerHTML=resp.data.map((r,i)=>`<tr><td style="padding:8px 10px">${i+1}</td><td style="padding:8px 10px">${r.sid}</td><td style="padding:8px 10px">${r.best}</td></tr>`).join(''); }catch(e){ tb.innerHTML=`<tr><td colspan="3" style="padding:8px 10px">讀取失敗：${e.message}</td></tr>`; } }

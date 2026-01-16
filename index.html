@@ -7,13 +7,11 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
 <header>
   <div class="chip">👨‍🎓 <span id="userChip">未登入</span></div>
   <div class="chip">分數 <b id="score">0</b></div>
   <div class="chip">時間 <b id="time">60</b>s</div>
-  <button id="btnStart" class="chip" style="cursor:pointer">▶️ 開始 / 暫停</button>
-  <button id="btnShowLeader" class="chip" style="cursor:pointer">🏆 排行榜</button>  <!-- NEW -->
-  <button id="btnRestart" class="chip" style="cursor:pointer">🔄 重新開始</button>    <!-- NEW -->
   <div class="chip" id="chipHint">提示：點擊注音鍵擊落相同符號的隕石。</div>
 </header>
 
@@ -21,7 +19,7 @@
   <canvas id="gameCanvas" width="1280" height="720"></canvas>
 </div>
 
-<!-- 置中彈窗版本的排行榜（內容同舊版） -->
+<!-- 置中彈窗版本的排行榜 -->
 <div id="leader" hidden>
   <div>
     <table>
@@ -52,7 +50,7 @@
   </div>
 </div>
 
-<!-- Login / teacher modal（保留，本機密碼 1070） -->
+<!-- Login / teacher modal（本機密碼 1070） -->
 <div id="login">
   <div id="card">
     <h2 style="margin:0 0 8px">登入遊戲</h2>
@@ -61,10 +59,10 @@
     <input id="sid" placeholder="例如：30130" inputmode="numeric" maxlength="5" />
     <div class="rowBtns">
       <button id="go" class="primary">登入</button>
-      <!-- 將原本的 <a id="teacherOpen" class="ghost" ...> 改成 .tag -->
-<a id="teacherOpen" class="tag" href="/teacher">教師後台</a>
-
-
+      <a id="teacherOpen" class="tag" href="/teacher">教師後台</a>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 <script src="main.js"></script>

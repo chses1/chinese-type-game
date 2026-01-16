@@ -88,6 +88,21 @@ header .chip {
 }
 .key:active{transform:translateY(1px)}
 .key.big{flex:2 1 0}          /* 若未來需要加長鍵，可給 .big */
+/* 控制鍵（放在鍵盤右側：暫停、結束） */
+.key.control{
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.28);
+  font-size:16px;
+  gap:6px;
+}
+.key.control:active{transform:translateY(1px)}
+
+/* 空格佔位（不會被點擊） */
+.key.spacer{
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
 
 /* compact keyboard mode（縮小整體高度與字級） */
 #kbd.compact{padding:4px 6px 10px}
