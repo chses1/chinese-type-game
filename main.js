@@ -131,20 +131,27 @@ document.addEventListener('DOMContentLoaded', () => {
   function spawn(){
   const label = ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
 
-  // ✅ 出生點：右上方（x 在畫面右側外面，y 在上方附近）
-  const x = W + 80;
-  const y = -60 + Math.random() * (H * 0.25);
+  // ✅ 出生點：右上方（畫面外）
+  const x = W + 80;                         // 右邊畫面外
+  const y = -60 + Math.random() * (H * 0.25); // 上方 1/4 區域隨機
 
-  // ✅ 速度：故意放慢一些，讓學生反應時間變長
-  // 你可以用這裡微調：數字越小越慢
-  const base = 0.9 + Math.random() * 1.3; // 約 0.9 ~ 2.2
+  // ✅ 基礎速度（刻意放慢，增加反應時間）
+  const base = 0.9 + Math.random() * 1.3;  // 約 0.9 ~ 2.2
 
-  // ✅ 斜向速度：往左（負 vx）+ 往下（正 vy）
-  const vx = -(base * 1.8);
-  const vy =  (base * 1.2);
+  // ✅ 斜向移動：右上 → 左下
+  const vx = -(base * 1.8); // 往左
+  const vy =  (base * 1.2); // 往下
 
-  meteors.push({ x, y, vx, vy, label, born: performance.now() });
+  meteors.push({
+    x,
+    y,
+    vx,
+    vy,
+    label,
+    born: performance.now()
+  });
 }
+
 
   function drawBackground(){
     ctx.clearRect(0,0,W,H);
