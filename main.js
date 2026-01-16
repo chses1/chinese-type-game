@@ -414,6 +414,9 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     score=0; correct=0; wrong=0; level=1;
     timeLeft=(LEVELS[level-1]?.duration)||60;
     setScore(); setTime(); meteors=[]; draw();
+// ✅ 登入後自動開始
+startGame();
+
   });
 
   $('teacherOpen') && ($('teacherOpen').onclick = () => { /* 預設超連結就會導去 /teacher */ });
