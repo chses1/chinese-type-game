@@ -39,6 +39,29 @@ const API = {
       headers:{ "x-teacher-token": token },
       body: JSON.stringify({ mode: "delete" })
     });
+
+    // ✅ NEW: 打擊爆炸特效（擴散圓）
+    const now = performance.now();
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      const e = explosions[i];
+      const t = (now - e.t0) / e.life;
+      if (t >= 1) { explosions.splice(i, 1); continue; }
+      const r = 18 + t * 70;
+      ctx.save();
+      ctx.globalAlpha = 1 - t;
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = (1 - t) * 0.6;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255,215,0,0.85)';
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, r * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 };
 
@@ -93,6 +116,11 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   // 狀態
   let meteors=[]; let running=false, score=0, timeLeft=(LEVELS[0].duration), spawnTimer=0;
   let correct=0, wrong=0;
+  // ====== NEW: Combo / 爆炸特效 / 黃金隕石 ======
+  let combo = 0;
+  let maxCombo = 0;
+  const explosions = []; // {x,y,t0,life}
+  const GOLD_CHANCE = 0.12; // 黃金隕石機率（12%）
   let me={sid:null,name:''};
   let teacherToken="";
 
@@ -180,6 +208,9 @@ function spawn(){
   // 隕石顯示的注音可以隨機
   const label = ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
 
+  // ✅ NEW: 黃金隕石（分數更高）
+  const type = (Math.random() < GOLD_CHANCE) ? 'gold' : 'normal';
+
   // ✅ 目標永遠固定：ㄅ鍵
   const targetKey = 'ㄅ';
 
@@ -213,13 +244,10 @@ function spawn(){
     vx,
     vy,
     label,
+    type,
     born: performance.now()
   });
 }
-
-
-
-
   function drawBackground(){
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle='rgba(255,255,255,.8)';
@@ -231,8 +259,18 @@ function spawn(){
     meteors.forEach(m=>{
       ctx.save(); ctx.translate(m.x,m.y);
       const size=300;
+      // ✅ NEW: 黃金隕石外圈光暈
+      if (m.type === 'gold') {
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.85)';
+        ctx.beginPath();
+        ctx.arc(0, 0, size*0.48, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
       if(imageReady) ctx.drawImage(meteorImg,-size/2,-size/2,size,size);
-      else { ctx.fillStyle='#3b82f6'; ctx.beginPath(); ctx.arc(0,0,size*0.45,0,Math.PI*2); ctx.fill(); }
+      else { ctx.fillStyle = (m.type==='gold') ? '#f59e0b' : '#3b82f6'; ctx.beginPath(); ctx.arc(0,0,size*0.45,0,Math.PI*2); ctx.fill(); }
       ctx.font='bold 100px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.lineWidth=5; ctx.strokeStyle='rgba(0,0,0,.6)';
       const xOffset=-size*0.08, yOffset=size*0.15;
@@ -257,12 +295,38 @@ function spawn(){
     if(idx>=0){
       const m = meteors[idx];
       meteors.splice(idx,1);
+
+      // ✅ NEW: 連擊（Combo）
+      combo++;
+      maxCombo = Math.max(maxCombo, combo);
+
+      // ✅ NEW: 爆炸特效（在隕石位置）
+      explosions.push({ x: m.x, y: m.y, t0: performance.now(), life: 260 });
+
       const rt = performance.now() - m.born;
       const pts = calcPoints(rt);
-      score += pts; correct++;
+
+      // ✅ NEW: 黃金隕石高分（固定 5 分）
+      const basePts = (m.type === 'gold') ? 5 : pts;
+
+      // ✅ NEW: Combo >= 5 進入 x2 模式
+      const mult = (combo >= 5) ? 2 : 1;
+
+      score += basePts * mult;
+      correct++;
       setScore();
-      toast && toast(`✅ +${pts}（${Math.round(rt)}ms）`);
+
+      if (m.type === 'gold') {
+        toast && toast(`✨ 黃金 +${basePts * mult}${mult===2 ? '（COMBO x2）' : ''}`);
+      } else if (mult === 2) {
+        toast && toast(`🔥 COMBO x2 +${basePts * mult}`);
+      } else {
+        toast && toast(`✅ +${basePts}（${Math.round(rt)}ms）`);
+      }
     }else{
+      // 打錯：連擊歸零
+      combo = 0;
+
       score = Math.max(0, score-1); wrong++;
       setScore(); toast && toast('❌ -1');
     }
@@ -287,6 +351,7 @@ meteors.forEach(m => {
     meteors.splice(i, 1);
     score = Math.max(0, score - 1);
     wrong++;
+    combo = 0; // ✅ NEW: 沒打到也算斷連擊
   }
 }
 
@@ -359,12 +424,12 @@ async function endAndShowLeader(){
     await setBest();
 
     if (passed && level < LEVELS.length) level++;
-    correct = 0; wrong = 0; meteors.length = 0;
+    correct = 0; wrong = 0; combo = 0; meteors.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60; setTime(); draw();
   }
 
   function restart(){
-    level=1; score=0; correct=0; wrong=0;
+    level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0;
     timeLeft=(LEVELS[level-1]?.duration)||60; setScore(); setTime();
     meteors=[]; draw(); closeResult(); startGame();
   }
@@ -414,7 +479,7 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     try { await API.upsertStudent({ sid }); } catch (e) { alert('登入失敗：' + e.message); return; }
     setUserChip(); await setBest();
     if ($('login')) $('login').style.display='none';
-    score=0; correct=0; wrong=0; level=1;
+    score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; level=1;
     timeLeft=(LEVELS[level-1]?.duration)||60;
     setScore(); setTime(); meteors=[]; draw();
 // ✅ 登入後自動開始
