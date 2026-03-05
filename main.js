@@ -75,9 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!canvas) return;
 
   
-  const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
 
-  // ===== 四種隕石圖片 =====
+  // ===== 四種隕石圖片（請放在 /img/ 目錄）=====
   const meteorImgs = {
     normal: new Image(),
     gold:   new Image(),
@@ -95,12 +95,10 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const [k,img] of Object.entries(meteorImgs)) {
     img.onload  = () => { imgReady[k] = true; };
     img.onerror = () => {
-      console.warn("隕石圖片載入失敗:", img.src);
+      console.warn("❌ 隕石圖片載入失敗：", img.src);
       imgReady[k] = false;
     };
   }
-
-
 
   const ZHUYIN=['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ','ㄚ','ㄛ','ㄜ','ㄝ','ㄞ','ㄟ','ㄠ','ㄡ','ㄢ','ㄣ','ㄤ','ㄥ','ㄦ','ˇ','ˋ','ˊ','˙'
 ];
@@ -132,7 +130,14 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let combo = 0;
   let maxCombo = 0;
   const explosions = []; // {x,y,t0,life}
-  const GOLD_CHANCE = 0.12; // 黃金隕石機率（12%）
+    const GOLD_CHANCE = 0.10; // 黃金隕石機率（10%）
+  const ICE_CHANCE  = 0.10; // 冰凍隕石機率（10%）
+  const BOSS_CHANCE = 0.04; // Boss 隕石機率（4%）
+
+  // 冰凍效果：打到冰凍隕石 → 所有隕石慢動作幾秒
+  let slowUntil = 0;          // performance.now() 的時間戳
+  const SLOW_MS = 3200;       // 慢動作持續時間
+  const SLOW_FACTOR = 0.45;   // 速度倍率（0.45 = 變慢）
   let me={sid:null,name:''};
   let teacherToken="";
 
@@ -217,46 +222,46 @@ const keyPositions = {};
   function applyKbdPref(){ const k=$('kbd'); if(!k) return; const compact=localStorage.getItem('kbd-compact')==='1'; k.classList.toggle('compact',compact); }
 
 function spawn(){
-  // 隕石顯示的注音可以隨機
   const label = ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
 
-  // ✅ NEW: 黃金隕石（分數更高）
-  const type = (Math.random() < GOLD_CHANCE) ? 'gold' : 'normal';
+  // 四種隕石機率（其餘就是 normal）
+  let type = 'normal';
+  const r = Math.random();
+  if (r < BOSS_CHANCE) type = 'boss';
+  else if (r < BOSS_CHANCE + ICE_CHANCE) type = 'ice';
+  else if (r < BOSS_CHANCE + ICE_CHANCE + GOLD_CHANCE) type = 'gold';
 
-  // ✅ 目標永遠固定：ㄅ鍵
   const targetKey = 'ㄅ';
-
-  // 如果ㄅ鍵位置還沒抓到（剛載入時可能會發生），先不生
   if (!keyPositions[targetKey]) return;
-
   const target = keyPositions[targetKey];
 
-  // ✅ 出生點：右上角畫面外（你也可以改成更靠右/更靠上）
   const startX = W + 100;
   const startY = -80;
 
-  // ✅ 目標點：ㄅ鍵的正上方（往上抬一點比較自然）
   const targetX = target.x;
   const targetY = target.y - 120;
 
-  // 計算方向向量（讓隕石朝目標飛）
   const dx = targetX - startX;
   const dy = targetY - startY;
   const len = Math.hypot(dx, dy) || 1;
 
-  // ✅ 飛行速度：建議先用 2.0~2.6（數字越小越慢、越好打）
-  const speed = 2.2;
+  const baseSpeed = 2.2;
+  const typeSpeed = (type === 'boss') ? 1.9 : (type === 'ice' ? 2.35 : baseSpeed);
 
-  const vx = (dx / len) * speed;
-  const vy = (dy / len) * speed;
+  const vx = (dx / len) * typeSpeed;
+  const vy = (dy / len) * typeSpeed;
+
+  const hp = (type === 'boss') ? 3 : 1;
+  const sizeMul = (type === 'boss') ? 1.35 : (type === 'gold' ? 1.08 : (type === 'ice' ? 1.08 : 1.0));
 
   meteors.push({
     x: startX,
     y: startY,
-    vx,
-    vy,
+    vx, vy,
     label,
     type,
+    hp,
+    sizeMul,
     born: performance.now()
   });
 }
@@ -267,29 +272,122 @@ function spawn(){
     ctx.globalAlpha=1;
   }
   function draw(){
-    drawBackground();
-    meteors.forEach(m=>{
-      ctx.save(); ctx.translate(m.x,m.y);
-      const size=300;
-      // ✅ NEW: 黃金隕石外圈光暈
-      if (m.type === 'gold') {
-        ctx.globalAlpha = 0.9;
-        ctx.lineWidth = 10;
-        ctx.strokeStyle = 'rgba(255, 215, 0, 0.85)';
-        ctx.beginPath();
-        ctx.arc(0, 0, size*0.48, 0, Math.PI*2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-      if(imageReady) ctx.drawImage(meteorImg,-size/2,-size/2,size,size);
-      else { ctx.fillStyle = (m.type==='gold') ? '#f59e0b' : '#3b82f6'; ctx.beginPath(); ctx.arc(0,0,size*0.45,0,Math.PI*2); ctx.fill(); }
-      ctx.font='bold 100px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.lineWidth=5; ctx.strokeStyle='rgba(0,0,0,.6)';
-      const xOffset=-size*0.08, yOffset=size*0.15;
-      ctx.strokeText(m.label,xOffset,yOffset); ctx.fillStyle='#fff'; ctx.fillText(m.label,xOffset,yOffset);
+  drawBackground();
+
+  const now = performance.now();
+  const isSlow = now < slowUntil;
+
+  meteors.forEach(m=>{
+    ctx.save();
+    ctx.translate(m.x, m.y);
+
+    const baseSize = 300;
+    const size = baseSize * (m.sizeMul || 1);
+
+    // 外圈提示（幫學生辨識）
+    if (m.type === 'gold') {
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = 'rgba(255,215,0,0.85)';
+      ctx.beginPath(); ctx.arc(0,0,size*0.48,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (m.type === 'ice') {
+      ctx.globalAlpha = 0.9;
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = 'rgba(120,220,255,0.85)';
+      ctx.beginPath(); ctx.arc(0,0,size*0.48,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (m.type === 'boss') {
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = 'rgba(255,120,120,0.9)';
+      ctx.beginPath(); ctx.arc(0,0,size*0.5,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // 畫圖：依照 type 選圖
+    const key = (m.type in meteorImgs) ? m.type : 'normal';
+    const ok = imgReady[key];
+
+    if (ok) {
+      ctx.drawImage(meteorImgs[key], -size/2, -size/2, size, size);
+    } else {
+      // fallback（圖片沒載到時）
+      ctx.fillStyle = (m.type==='gold') ? '#f59e0b'
+                 : (m.type==='ice' ? '#5eead4'
+                 : (m.type==='boss' ? '#ef4444' : '#3b82f6'));
+      ctx.beginPath(); ctx.arc(0,0,size*0.45,0,Math.PI*2); ctx.fill();
+    }
+
+    // Boss 血量條
+    if (m.type === 'boss') {
+      const hp = Math.max(0, Number(m.hp||0));
+      const maxHp = 3;
+      const w = size*0.6;
+      const h = 14;
+      const x = -w/2;
+      const y = -size*0.55;
+
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(x, y, w, h);
+
+      const ratio = Math.min(1, hp / maxHp);
+      ctx.fillStyle = 'rgba(255,90,90,0.95)';
+      ctx.fillRect(x, y, w*ratio, h);
       ctx.restore();
-    });
+    }
+
+    // 注音字
+    ctx.font='bold 100px system-ui';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.lineWidth=5;
+    ctx.strokeStyle='rgba(0,0,0,.6)';
+    const xOffset=-size*0.08, yOffset=size*0.15;
+    ctx.strokeText(m.label,xOffset,yOffset);
+    ctx.fillStyle='#fff';
+    ctx.fillText(m.label,xOffset,yOffset);
+
+    ctx.restore();
+  });
+
+  // 爆炸特效（擴散圈）
+  for (let i = explosions.length - 1; i >= 0; i--) {
+    const e = explosions[i];
+    const t = (now - e.t0) / e.life;
+    if (t >= 1) { explosions.splice(i, 1); continue; }
+    const r = 20 + t * 110;
+
+    ctx.save();
+    ctx.globalAlpha = 1 - t;
+
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.stroke();
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(255,215,0,0.8)';
+    ctx.beginPath(); ctx.arc(e.x, e.y, r * 0.6, 0, Math.PI * 2); ctx.stroke();
+
+    ctx.restore();
   }
+
+  // 冰凍提示
+  if (isSlow) {
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(18, 18, 220, 52);
+    ctx.fillStyle = '#bff6ff';
+    ctx.font = 'bold 28px system-ui';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('❄️ 冰凍慢動作！', 30, 44);
+    ctx.restore();
+  }
+}
 
   function calcPoints(rtMs){
     if (rtMs <= 1500) return 3;
@@ -349,11 +447,11 @@ function spawn(){
       spawnTimer += 16;
       if (spawnTimer > spawnInterval()) { spawn(); spawnTimer = 0; }
       const f = 1 + 0.08 * (level - 1); // ✅ 等級加速，但不要太兇（0.08 比 0.1 更溫和）
+const slow = (performance.now() < slowUntil) ? SLOW_FACTOR : 1;
 meteors.forEach(m => {
-  m.x += m.vx * 2 * f;
-  m.y += m.vy * 2 * f;
+  m.x += m.vx * 2 * f * slow;
+  m.y += m.vy * 2 * f * slow;
 });
-
       for (let i = meteors.length - 1; i >= 0; i--) {
   const m = meteors[i];
   const outBottom = m.y > H + 60;
@@ -366,7 +464,6 @@ meteors.forEach(m => {
     combo = 0; // ✅ NEW: 沒打到也算斷連擊
   }
 }
-
       draw();
     }
     requestAnimationFrame(step);
