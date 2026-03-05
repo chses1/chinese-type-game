@@ -74,20 +74,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const canvas = $('gameCanvas');
   if (!canvas) return;
 
+  
   const ctx = canvas.getContext('2d');
-    const meteorImg = new Image();
 
-  // ✅ 隕石圖請放在 /img/Q.png（建議與 earth_bg.png 同一層）
-  meteorImg.src = "img/Q.png";
-
-  let imageReady = false;
-  meteorImg.onload = () => imageReady = true;
-
-  // ✅ 加上 onerror，方便你在 Console 一眼看出是不是路徑問題
-  meteorImg.onerror = () => {
-    console.warn("❌ 隕石圖片載入失敗：", meteorImg.src);
-    imageReady = false;
+  // ===== 四種隕石圖片 =====
+  const meteorImgs = {
+    normal: new Image(),
+    gold:   new Image(),
+    ice:    new Image(),
+    boss:   new Image(),
   };
+
+  meteorImgs.normal.src = "img/meteor_normal.png";
+  meteorImgs.gold.src   = "img/meteor_gold.png";
+  meteorImgs.ice.src    = "img/meteor_ice.png";
+  meteorImgs.boss.src   = "img/meteor_boss.png";
+
+  const imgReady = { normal:false, gold:false, ice:false, boss:false };
+
+  for (const [k,img] of Object.entries(meteorImgs)) {
+    img.onload  = () => { imgReady[k] = true; };
+    img.onerror = () => {
+      console.warn("隕石圖片載入失敗:", img.src);
+      imgReady[k] = false;
+    };
+  }
+
 
 
   const ZHUYIN=['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ','ㄚ','ㄛ','ㄜ','ㄝ','ㄞ','ㄟ','ㄠ','ㄡ','ㄢ','ㄣ','ㄤ','ㄥ','ㄦ','ˇ','ˋ','ˊ','˙'
