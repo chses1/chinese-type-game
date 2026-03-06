@@ -698,8 +698,7 @@ async function endAndShowLeader(){
 
   function confirmRestart(){
     if (!me.sid) { toast && toast('請先登入'); return; }
-    const ok = confirm('確定要重新開始嗎？
-目前分數會歸零，但不會登出帳號。');
+    const ok = confirm('確定要重新開始嗎？\n目前分數會歸零，但不會登出帳號。');
     if (!ok) return;
     restart();
   }
