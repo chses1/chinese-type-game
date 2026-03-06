@@ -183,10 +183,11 @@ const keyPositions = {};
 
       // 控制鍵
       if (ch === '__PAUSE__') {
-        b.className = 'key control';
-        b.textContent = '⏸ 暫停';
-        b.onclick = () => toggleRun();
-      } else if (ch === '__END__') {
+  b.className = 'key control';
+  b.id = 'pauseBtn';
+  b.textContent = '⏸ 暫停';
+  b.onclick = () => toggleRun();
+} else if (ch === '__END__') {
         b.className = 'key control';
         b.textContent = '⏹ 結束';
         b.onclick = () => endAndShowLeader();
@@ -613,7 +614,11 @@ meteors.forEach(m => {
     requestAnimationFrame(step);
   }
 
-  function startGame(){ if(!me.sid){ toast && toast('請先登入'); return; } running=true; ticker(); }
+  function startGame(){ 
+    if(!me.sid){ toast && toast('請先登入'); return; } running=true; ticker(); 
+  const btn = document.getElementById('pauseBtn');
+if (btn) btn.textContent = '⏸ 暫停';
+}
   function pauseGame(){
     running = false;
 
@@ -629,8 +634,21 @@ meteors.forEach(m => {
     explosions.length = 0;
 
     draw();
+    const btn = document.getElementById('pauseBtn');
+if (btn) btn.textContent = '▶ 開始';
   }
-  function toggleRun(){ running?pauseGame():startGame(); }
+function toggleRun(){
+  if (running) {
+    pauseGame();
+  } else {
+    startGame();
+  }
+
+  const btn = document.getElementById('pauseBtn');
+  if (btn) {
+    btn.textContent = running ? '⏸ 暫停' : '▶ 開始';
+  }
+}
 // ✅ 結束：顯示排行榜後「自動重新開始」
 // 做法：先停下遊戲 → 送出最佳分數 → 打開排行榜 → 當排行榜關閉時重開
 let leaderAutoRestart = false;
