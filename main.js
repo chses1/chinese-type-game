@@ -183,18 +183,17 @@ const keyPositions = {};
 
       // 控制鍵
       if (ch === '__PAUSE__') {
-  b.className = 'key control';
-  b.id = 'pauseBtn';
-  b.textContent = '⏸ 暫停';
-  b.onclick = () => toggleRun();
-} else if (ch === '__END__') {
+        b.className = 'key control';
+        b.textContent = '⏸ 暫停';
+        b.onclick = () => toggleRun();
+      } else if (ch === '__END__') {
         b.className = 'key control';
         b.textContent = '⏹ 結束';
         b.onclick = () => endAndShowLeader();
       } else if (ch === '__RESTART__') {
         b.className = 'key control';
         b.textContent = '🔄 重來';
-        b.onclick = () => confirmRestart();
+        b.onclick = () => restart();
       } else {
         // 一般注音鍵
         b.className='key '+(ZHUYIN.includes(ch)?keyClass(ch):'');
@@ -614,11 +613,7 @@ meteors.forEach(m => {
     requestAnimationFrame(step);
   }
 
-  function startGame(){ 
-    if(!me.sid){ toast && toast('請先登入'); return; } running=true; ticker(); 
-  const btn = document.getElementById('pauseBtn');
-if (btn) btn.textContent = '⏸ 暫停';
-}
+  function startGame(){ if(!me.sid){ toast && toast('請先登入'); return; } running=true; ticker(); }
   function pauseGame(){
     running = false;
 
@@ -634,21 +629,8 @@ if (btn) btn.textContent = '⏸ 暫停';
     explosions.length = 0;
 
     draw();
-    const btn = document.getElementById('pauseBtn');
-if (btn) btn.textContent = '▶ 開始';
   }
-function toggleRun(){
-  if (running) {
-    pauseGame();
-  } else {
-    startGame();
-  }
-
-  const btn = document.getElementById('pauseBtn');
-  if (btn) {
-    btn.textContent = running ? '⏸ 暫停' : '▶ 開始';
-  }
-}
+  function toggleRun(){ running?pauseGame():startGame(); }
 // ✅ 結束：顯示排行榜後「自動重新開始」
 // 做法：先停下遊戲 → 送出最佳分數 → 打開排行榜 → 當排行榜關閉時重開
 let leaderAutoRestart = false;
@@ -710,21 +692,15 @@ async function endAndShowLeader(){
     await setBest();
 
     if (passed && level < LEVELS.length) level++;
+    if (classroomMode) {
+      classroomRoundFinished = true;
+      showClassroomOverlay('本回合結束', '請等待老師下一次開始', '你可以先看成績，不能自行重開。');
+    }
     correct = 0; wrong = 0; combo = 0; meteors.length = 0; lasers.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60; setTime(); draw();
   }
 
-  function confirmRestart(){
-    if (!me.sid) { toast && toast('請先登入'); return; }
-    const ok = confirm('確定要重新開始嗎？\n目前分數會歸零，但不會登出帳號。');
-    if (!ok) return;
-    restart();
-  }
-
   function restart(){
-    running = false;
-    clearInterval(timerId);
-    leaderAutoRestart = false;
     level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0;
     timeLeft=(LEVELS[level-1]?.duration)||60; setScore(); setTime();
     meteors=[]; draw(); closeResult(); startGame();

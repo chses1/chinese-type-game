@@ -33,7 +33,19 @@
   </div>
 </div>
 
+
+<div id="classroomOverlay" hidden style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:35">
+  <div style="width:min(520px,92vw);background:rgba(12,30,66,.92);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:24px;text-align:center;backdrop-filter:blur(8px)">
+    <h2 id="classroomTitle" style="margin:0 0 10px;color:#ffd54a">班級競賽模式</h2>
+    <div id="classroomMsg" style="font-size:24px;font-weight:700">等待老師開始…</div>
+    <div id="classroomSub" style="margin-top:10px;opacity:.85">老師按下開始後，全班會同步倒數。</div>
+  </div>
+</div>
+
+<div id="modeChip" class="chip" style="position:fixed;right:12px;top:58px;z-index:6;display:none">模式：自由練習</div>
+
 <div id="kbd"></div>
+
 
 <!-- Result Modal -->
 <div id="resultBox">

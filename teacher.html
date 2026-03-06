@@ -85,6 +85,35 @@
         </table>
       </div>
 
+
+      <div class="card" style="margin-top:16px">
+        <h2 style="margin:0 0 10px">教室競賽控制</h2>
+        <div class="row">
+          <div>
+            <label>競賽班級（三碼）</label>
+            <input id="ccClassPrefix" placeholder="301" maxlength="3" inputmode="numeric" />
+          </div>
+          <div>
+            <label>倒數秒數</label>
+            <select id="ccCountdown"><option value="3">3 秒</option><option value="5">5 秒</option></select>
+          </div>
+          <div>
+            <label>目前狀態</label>
+            <div id="ccState" class="tag" style="width:100%">未開啟</div>
+          </div>
+        </div>
+
+        <div class="toolbar" style="margin-top:12px">
+          <button id="btnCcOpen" class="tag">🏫 開啟班級競賽</button>
+          <button id="btnCcStart" class="primary">▶️ 全班開始</button>
+          <button id="btnCcPause" class="tag">⏸️ 全班暫停</button>
+          <button id="btnCcRestart" class="tag">🔄 全班重來</button>
+          <button id="btnCcClose" class="ghost danger">⛔ 結束競賽</button>
+        </div>
+
+        <div class="muted" style="margin-top:10px">說明：開啟後，該班學生登入會進入等待畫面；老師按「全班開始」後，全班同步倒數開始。學生仍可在沒有開啟競賽時自由練習。</div>
+      </div>
+
       <div style="margin-top:10px">
         <h3 style="margin:.6rem 0 .2rem 0;font-size:14px;opacity:.9">班級清單</h3>
         <div id="classList" style="display:flex;flex-wrap:wrap;gap:8px"></div>

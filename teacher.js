@@ -54,7 +54,143 @@ const API = {
       body: JSON.stringify({ mode:'delete' })
     });
   },
+  classroomState(){
+    return jsonFetch(`${API_BASE}/classroom/state`);
+  },
+  classroomOpen(classPrefix, token){
+    return jsonFetch(`${API_BASE}/admin/classroom/open`, {
+      method:'POST',
+      headers:{ 'x-teacher-token': token },
+      body: JSON.stringify({ classPrefix })
+    });
+  },
+  classroomStart(classPrefix, countdownSec, token){
+    return jsonFetch(`${API_BASE}/admin/classroom/start`, {
+      method:'POST',
+      headers:{ 'x-teacher-token': token },
+      body: JSON.stringify({ classPrefix, countdownSec })
+    });
+  },
+  classroomPause(token){
+    return jsonFetch(`${API_BASE}/admin/classroom/pause`, {
+      method:'POST',
+      headers:{ 'x-teacher-token': token },
+      body: JSON.stringify({})
+    });
+  },
+  classroomRestart(countdownSec, token){
+    return jsonFetch(`${API_BASE}/admin/classroom/restart`, {
+      method:'POST',
+      headers:{ 'x-teacher-token': token },
+      body: JSON.stringify({ countdownSec })
+    });
+  },
+  classroomClose(token){
+    return jsonFetch(`${API_BASE}/admin/classroom/close`, {
+      method:'POST',
+      headers:{ 'x-teacher-token': token },
+      body: JSON.stringify({})
+    });
+  },
 };
+
+
+let classroomTimer = null;
+
+function syncCcClassPrefix(v){
+  if ($('ccClassPrefix')) $('ccClassPrefix').value = v || '';
+}
+
+function renderClassroomState(s){
+  const box = $('ccState');
+  if (!box) return;
+  if (!s?.enabled) { box.textContent = '未開啟'; return; }
+  let text = `班級 ${s.classPrefix}｜`;
+  if (s.status === 'countdown') {
+    const sec = Math.max(0, Math.ceil(((s.startAt || 0) - (s.now || Date.now())) / 1000));
+    text += `倒數中 ${sec} 秒`;
+  } else if (s.status === 'running') {
+    text += '進行中';
+  } else if (s.status === 'paused') {
+    text += '已暫停';
+  } else {
+    text += '等待開始';
+  }
+  box.textContent = text;
+}
+
+async function refreshClassroomState(){
+  try {
+    const resp = await API.classroomState();
+    const s = resp.data;
+    renderClassroomState(s);
+    if (s?.enabled && /^\d{3}$/.test(s.classPrefix)) {
+      if ($('classPrefix')) $('classPrefix').value = s.classPrefix;
+      syncCcClassPrefix(s.classPrefix);
+      await loadClassRank();
+    }
+  } catch (e) {
+    console.warn('classroom state fail', e);
+  }
+}
+
+function startClassroomPolling(){
+  clearInterval(classroomTimer);
+  classroomTimer = setInterval(refreshClassroomState, 2000);
+  refreshClassroomState();
+}
+
+async function ccOpen(){
+  const token = getToken();
+  const p = ($('ccClassPrefix')?.value || $('classPrefix')?.value || '').trim();
+  if (!token) return alert('請先輸入教師密碼');
+  if (!/^\d{3}$/.test(p)) return alert('請輸入班級前三碼');
+  await API.classroomOpen(p, token);
+  if ($('classPrefix')) $('classPrefix').value = p;
+  syncCcClassPrefix(p);
+  toast(`已開啟 ${p} 班競賽`);
+  await refreshClassroomState();
+}
+
+async function ccStart(){
+  const token = getToken();
+  const p = ($('ccClassPrefix')?.value || $('classPrefix')?.value || '').trim();
+  const countdownSec = Number(($('ccCountdown')?.value) || 3);
+  if (!token) return alert('請先輸入教師密碼');
+  if (!/^\d{3}$/.test(p)) return alert('請輸入班級前三碼');
+  await API.classroomStart(p, countdownSec, token);
+  if ($('classPrefix')) $('classPrefix').value = p;
+  syncCcClassPrefix(p);
+  toast('全班開始倒數');
+  await refreshClassroomState();
+}
+
+async function ccPause(){
+  const token = getToken();
+  if (!token) return alert('請先輸入教師密碼');
+  await API.classroomPause(token);
+  toast('已全班暫停');
+  await refreshClassroomState();
+}
+
+async function ccRestart(){
+  const token = getToken();
+  const countdownSec = Number(($('ccCountdown')?.value) || 3);
+  if (!token) return alert('請先輸入教師密碼');
+  if (!confirm('確定要讓全班重新開始嗎？目前分數會從 0 重新計算。')) return;
+  await API.classroomRestart(countdownSec, token);
+  toast('全班重新倒數');
+  await refreshClassroomState();
+}
+
+async function ccClose(){
+  const token = getToken();
+  if (!token) return alert('請先輸入教師密碼');
+  if (!confirm('確定要結束班級競賽嗎？學生會回到自由練習模式。')) return;
+  await API.classroomClose(token);
+  toast('已結束競賽');
+  await refreshClassroomState();
+}
 
 // ====== UI 動作 ======
 async function loadClasses(){
@@ -122,6 +258,11 @@ $('btnShowAll')      && ($('btnShowAll').onclick     = loadAllRank);
 $('btnLoadClassRank')&& ($('btnLoadClassRank').onclick= loadClassRank);
 $('btnClearClass')   && ($('btnClearClass').onclick  = clearClass);
 $('btnClearAll')     && ($('btnClearAll').onclick    = clearAll);
+$('btnCcOpen')       && ($('btnCcOpen').onclick      = ccOpen);
+$('btnCcStart')      && ($('btnCcStart').onclick     = ccStart);
+$('btnCcPause')      && ($('btnCcPause').onclick     = ccPause);
+$('btnCcRestart')    && ($('btnCcRestart').onclick   = ccRestart);
+$('btnCcClose')      && ($('btnCcClose').onclick     = ccClose);
 
 // 🔒 鎖定流程
 (function init(){
@@ -132,10 +273,14 @@ $('btnClearAll')     && ($('btnClearAll').onclick    = clearAll);
   $('lockEnter') && ($('lockEnter').onclick = () => {
     const v = ($('lockPass')?.value || '').trim();
     if (!v) return alert('請輸入教師密碼');
-    setToken(v); hideLock(); loadClasses(); loadAllRank(); toast('已解鎖');
+    setToken(v); hideLock(); loadClasses(); loadAllRank(); startClassroomPolling(); toast('已解鎖');
   });
-  $('btnRelock') && ($('btnRelock').onclick = () => { setToken(''); showLock(); if($('lockPass')) $('lockPass').value=''; });
+  $('btnRelock') && ($('btnRelock').onclick = () => { setToken(''); clearInterval(classroomTimer); showLock(); if($('lockPass')) $('lockPass').value=''; });
 
   // 開啟頁面：有 token 就直接載入，沒有就先鎖住
-  if (getToken()) { hideLock(); loadClasses(); loadAllRank(); } else { showLock(); }
+  if ($('classPrefix') && $('ccClassPrefix')) {
+    $('classPrefix').addEventListener('input', ()=> syncCcClassPrefix(($('classPrefix').value||'').trim()));
+    $('ccClassPrefix').addEventListener('input', ()=> { if ($('classPrefix')) $('classPrefix').value = ($('ccClassPrefix').value||'').trim(); });
+  }
+  if (getToken()) { hideLock(); loadClasses(); loadAllRank(); startClassroomPolling(); } else { showLock(); }
 })();
