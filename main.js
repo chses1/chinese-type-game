@@ -696,7 +696,21 @@ async function endAndShowLeader(){
       btn.replaceWith(freshBtn);
       if (passed) {
         freshBtn.textContent = '挑戰下一關';
-        freshBtn.onclick = () => { closeResult(); startGame(); };
+        freshBtn.onclick = () => {
+          closeResult();
+          correct = 0;
+          wrong = 0;
+          combo = 0;
+          maxCombo = 0;
+          meteors.length = 0;
+          lasers.length = 0;
+          explosions.length = 0;
+          gameEnded = false;
+          timeLeft = (LEVELS[level-1]?.duration) || 60;
+          setTime();
+          draw();
+          startGame();
+        };
       } else {
         freshBtn.textContent = '重新開始';
         freshBtn.onclick = () => { closeResult(); restart(); };
@@ -707,7 +721,9 @@ async function endAndShowLeader(){
   function closeResult(){ if ($('resultBox')) $('resultBox').style.display='none'; }
 
   async function endGame(){
-    running = false; clearInterval(timerId);
+    running = false;
+    clearInterval(timerId);
+    gameEnded = true;
 
     const dur = (LEVELS[level-1]?.duration) || 60;
     const elapsed = dur - Math.max(0, timeLeft);
@@ -716,18 +732,40 @@ async function endAndShowLeader(){
     const speed = correct / minutes;
     const passed = acc >= ACC_THRESHOLD;
 
+    // 先顯示結果，再立刻把「下一局需要的狀態」準備好，避免任何後續錯誤導致下一關時間仍是 0
     showResult({ correct, wrong, acc, speed, passed });
 
-    if (me.sid) await submitBest(me.sid, score);
-    await setBest();
-
     if (passed && level < LEVELS.length) level++;
-    if (classroomMode) {
-      classroomRoundFinished = true;
-      showClassroomOverlay('本回合結束', '請等待老師下一次開始', '你可以先看成績，不能自行重開。');
+
+    correct = 0;
+    wrong = 0;
+    combo = 0;
+    maxCombo = 0;
+    meteors.length = 0;
+    lasers.length = 0;
+    explosions.length = 0;
+    timeLeft = (LEVELS[level-1]?.duration) || 60;
+    setTime();
+    draw();
+
+    // 下面這些屬於附加功能，就算失敗也不能影響下一關
+    try {
+      if (me.sid) await submitBest(me.sid, score);
+      await setBest();
+    } catch (e) {
+      console.warn('endGame submit/setBest fail', e);
     }
-    correct = 0; wrong = 0; combo = 0; meteors.length = 0; lasers.length = 0;
-    timeLeft = (LEVELS[level-1]?.duration) || 60; setTime(); draw();
+
+    try {
+      if (typeof classroomMode !== 'undefined' && classroomMode) {
+        classroomRoundFinished = true;
+        if (typeof showClassroomOverlay === 'function') {
+          showClassroomOverlay('本回合結束', '請等待老師下一次開始', '你可以先看成績，不能自行重開。');
+        }
+      }
+    } catch (e) {
+      console.warn('classroom overlay fail', e);
+    }
   }
 
   function restart(){
