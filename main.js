@@ -103,6 +103,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   // 狀態
   let meteors=[]; let running=false, score=0, timeLeft=(LEVELS[0].duration), spawnTimer=0;
   let correct=0, wrong=0;
+  let gameEnded = false; // 防止 endGame 重複觸發
   // ====== NEW: Combo / 爆炸特效 / 黃金隕石 ======
   let combo = 0;
   let maxCombo = 0;
@@ -627,6 +628,7 @@ meteors.forEach(m => {
   }
 
   function startGame(){
+    gameEnded = false; // 每局開始重置
     if(!me.sid){
       toast && toast('請先登入');
       return;
@@ -676,7 +678,10 @@ async function endAndShowLeader(){
 }
 
   let timerId=null;
-  function ticker(){ clearInterval(timerId); timerId=setInterval(()=>{ if(!running) return; timeLeft--; setTime(); if(timeLeft<=0) endGame(); },1000); }
+  function ticker(){ clearInterval(timerId); timerId=setInterval(()=>{ if(!running) return; timeLeft--; setTime(); if(timeLeft<=0 && !gameEnded){
+      gameEnded = true;
+      endGame();
+    } },1000); }
 
   function showResult({correct, wrong, acc, speed, passed}){
     if ($('resCorrect')) $('resCorrect').textContent = correct;
@@ -726,6 +731,7 @@ async function endAndShowLeader(){
   }
 
   function restart(){
+    gameEnded = false; // 重置結束狀態
     level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0;
     timeLeft=(LEVELS[level-1]?.duration)||60; setScore(); setTime();
     meteors=[]; draw(); closeResult(); startGame();
