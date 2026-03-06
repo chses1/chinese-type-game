@@ -231,11 +231,14 @@ function spawn(){
   else if (r < BOSS_CHANCE + ICE_CHANCE) type = 'ice';
   else if (r < BOSS_CHANCE + ICE_CHANCE + GOLD_CHANCE) type = 'gold';
 
-  const targetKey = 'ㄅ';
+  // ✅ NEW: 隕石瞄準「對應注音鍵」
+  const targetKey = label;
   if (!keyPositions[targetKey]) return;
   const target = keyPositions[targetKey];
 
-  const startX = W + 100;
+  // ✅ NEW: 隨機從左/右側出現
+  const fromLeft = Math.random() < 0.5;
+  const startX = fromLeft ? -100 : W + 100;
   const startY = -80;
 
   const targetX = target.x;
@@ -254,6 +257,9 @@ function spawn(){
   const hp = (type === 'boss') ? 3 : 1;
   const sizeMul = (type === 'boss') ? 1.35 : (type === 'gold' ? 1.08 : (type === 'ice' ? 1.08 : 1.0));
 
+  // ✅ NEW: Boss 出現警告
+  if (type === 'boss' && typeof toast === 'function') toast('⚠️ Boss 隕石！');
+
   meteors.push({
     x: startX,
     y: startY,
@@ -262,7 +268,10 @@ function spawn(){
     type,
     hp,
     sizeMul,
-    born: performance.now()
+    born: performance.now(),
+    // ✅ NEW: 旋轉參數
+    rot: Math.random() * Math.PI,
+    rotSpeed: (Math.random() - 0.5) * 0.10
   });
 }
   function drawBackground(){
@@ -278,8 +287,28 @@ function spawn(){
   const isSlow = now < slowUntil;
 
   meteors.forEach(m=>{
+    // ✅ NEW: 隕石拖尾（流星感）
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = (m.type === 'ice') ? 'rgba(120,220,255,0.35)'
+                   : (m.type === 'gold') ? 'rgba(255,215,0,0.35)'
+                   : (m.type === 'boss') ? 'rgba(255,120,120,0.35)'
+                   : 'rgba(255,255,255,0.28)';
+    ctx.beginPath();
+    ctx.moveTo(m.x - (m.vx || 0) * 28, m.y - (m.vy || 0) * 28);
+    ctx.lineTo(m.x, m.y);
+    ctx.stroke();
+    ctx.restore();
+
     ctx.save();
     ctx.translate(m.x, m.y);
+
+    // ✅ NEW: 旋轉
+    if (typeof m.rot === 'number' && typeof m.rotSpeed === 'number') {
+      m.rot += m.rotSpeed;
+      ctx.rotate(m.rot);
+    }
 
     const baseSize = 300;
     const size = baseSize * (m.sizeMul || 1);
@@ -387,6 +416,18 @@ function spawn(){
     ctx.fillText('❄️ 冰凍慢動作！', 30, 44);
     ctx.restore();
   }
+
+  // ✅ NEW: Combo 火焰提示（連擊 ≥ 5 才顯示）
+  if (combo >= 5) {
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.font = 'bold 64px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(255,165,0,0.95)';
+    ctx.fillText(`🔥 COMBO ${combo} (x2)`, W * 0.5, 18);
+    ctx.restore();
+  }
 }
 
   function calcPoints(rtMs){
@@ -404,22 +445,54 @@ function spawn(){
     }
     if(idx>=0){
       const m = meteors[idx];
-      meteors.splice(idx,1);
 
-      // ✅ NEW: 連擊（Combo）
+      // ✅ NEW: Boss 有血量（打到先扣血，血量歸 0 才消失）
+      let removed = true;
+      if (m.type === 'boss') {
+        m.hp = Math.max(0, Number(m.hp || 0) - 1);
+        if (m.hp > 0) {
+          removed = false;
+          // 讓下一次計算反應時間更公平
+          m.born = performance.now();
+        }
+      }
+
+      if (removed) meteors.splice(idx, 1);
+
+      // ✅ 連擊（Combo）
       combo++;
       maxCombo = Math.max(maxCombo, combo);
 
-      // ✅ NEW: 爆炸特效（在隕石位置）
+      // ✅ 爆炸特效（在隕石位置）
       explosions.push({ x: m.x, y: m.y, t0: performance.now(), life: 260 });
+
+      // ✅ NEW: 黃金隕石粒子爆炸（多幾圈）
+      if (m.type === 'gold') {
+        for (let i = 0; i < 8; i++) {
+          explosions.push({
+            x: m.x + Math.random() * 40 - 20,
+            y: m.y + Math.random() * 40 - 20,
+            t0: performance.now(),
+            life: 420
+          });
+        }
+      }
+
+      // ✅ NEW: Boss 命中螢幕震動
+      if (m.type === 'boss') {
+        const dx = (Math.random() < 0.5 ? -1 : 1) * 4;
+        const dy = (Math.random() < 0.5 ? -1 : 1) * 2;
+        canvas.style.transform = `translate(${dx}px, ${dy}px)`;
+        setTimeout(() => { canvas.style.transform = ''; }, 60);
+      }
 
       const rt = performance.now() - m.born;
       const pts = calcPoints(rt);
 
-      // ✅ NEW: 黃金隕石高分（固定 5 分）
+      // 黃金隕石固定高分
       const basePts = (m.type === 'gold') ? 5 : pts;
 
-      // ✅ NEW: Combo >= 5 進入 x2 模式
+      // Combo >= 5 進入 x2
       const mult = (combo >= 5) ? 2 : 1;
 
       score += basePts * mult;
@@ -428,6 +501,8 @@ function spawn(){
 
       if (m.type === 'gold') {
         toast && toast(`✨ 黃金 +${basePts * mult}${mult===2 ? '（COMBO x2）' : ''}`);
+      } else if (m.type === 'boss' && !removed) {
+        toast && toast(`💥 Boss 命中！剩 ${m.hp} 血`);
       } else if (mult === 2) {
         toast && toast(`🔥 COMBO x2 +${basePts * mult}`);
       } else {
