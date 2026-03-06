@@ -24,6 +24,7 @@ const API = {
   },
   getStudent(sid)  { return jsonFetch(`${API_BASE}/student/${sid}`); },
   getClasses()     { return jsonFetch(`${API_BASE}/classes`); },
+  classroomState() { return jsonFetch(`${API_BASE}/classroom/state`); },
 
   // ✅ 「刪除整筆」模式（含學號）
   adminClearClass(prefix, token){
@@ -139,13 +140,119 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let me={sid:null,name:''};
   let teacherToken="";
 
+  // ===== 教室競賽模式 =====
+  let classroomMode = false;
+  let classroomRoundFinished = false;
+  let classroomPollTimer = null;
+  let classroomLastRoundId = 0;
+  let classroomCountdownEnd = 0;
+  let classroomCurrentClass = '';
+
   const setUserChip=()=>$('userChip') && ($('userChip').textContent=me.sid?`${me.sid}`:'未登入');
   const setScore=()=>$('score') && ($('score').textContent=score);
   const setTime =()=>$('time') && ($('time').textContent=timeLeft);
 
   function updatePauseButton(){
     const btn = document.querySelector('#kbd .key.control');
-    if (btn) btn.textContent = running ? '⏸ 暫停' : '▶️ 開始';
+    if (!btn) return;
+    if (classroomMode) {
+      btn.textContent = running ? '⏸ 暫停' : '⏳ 等待';
+    } else {
+      btn.textContent = running ? '⏸ 暫停' : '▶️ 開始';
+    }
+  }
+
+  function setModeChip(text='模式：自由練習', show=false){
+    const chip = $('modeChip');
+    if (!chip) return;
+    chip.textContent = text;
+    chip.style.display = show ? 'block' : 'none';
+  }
+
+  function showClassroomOverlay(title='班級競賽模式', msg='等待老師開始…', sub='老師按下開始後，全班會同步倒數。'){
+    const o = $('classroomOverlay');
+    if (!o) return;
+    if ($('classroomTitle')) $('classroomTitle').textContent = title;
+    if ($('classroomMsg')) $('classroomMsg').textContent = msg;
+    if ($('classroomSub')) $('classroomSub').textContent = sub;
+    o.hidden = false;
+    o.style.display = 'flex';
+  }
+
+  function hideClassroomOverlay(){
+    const o = $('classroomOverlay');
+    if (!o) return;
+    o.hidden = true;
+    o.style.display = 'none';
+  }
+
+  function stopClassroomPolling(){
+    if (classroomPollTimer) {
+      clearInterval(classroomPollTimer);
+      classroomPollTimer = null;
+    }
+  }
+
+  async function syncClassroomState(){
+    if (!me.sid) return;
+    try {
+      const resp = await API.classroomState();
+      const s = resp.data || {};
+      const myClass = String(me.sid).slice(0, 3);
+      const isMine = !!(s.enabled && s.classPrefix === myClass);
+
+      if (!isMine) {
+        classroomMode = false;
+        classroomCurrentClass = '';
+        classroomCountdownEnd = 0;
+        classroomLastRoundId = 0;
+        hideClassroomOverlay();
+        setModeChip('模式：自由練習', false);
+        updatePauseButton();
+        return;
+      }
+
+      classroomMode = true;
+      classroomCurrentClass = s.classPrefix || myClass;
+      setModeChip(`模式：${classroomCurrentClass} 班級競賽`, true);
+
+      const serverNow = Number(s.now || Date.now());
+      const roundId = Number(s.roundId || 0);
+      const status = String(s.status || 'idle');
+
+      if (roundId !== classroomLastRoundId) {
+        classroomLastRoundId = roundId;
+        classroomRoundFinished = false;
+      }
+
+      if (status === 'idle') {
+        pauseGame();
+        showClassroomOverlay('班級競賽模式', '等待老師開始…', '老師按下開始後，全班會同步倒數。');
+      } else if (status === 'countdown') {
+        classroomCountdownEnd = Number(s.startAt || 0);
+        const sec = Math.max(0, Math.ceil((classroomCountdownEnd - serverNow) / 1000));
+        pauseGame();
+        showClassroomOverlay('班級競賽模式', `倒數 ${sec} 秒`, '請準備好，倒數結束後會自動開始。');
+      } else if (status === 'running') {
+        hideClassroomOverlay();
+        if (!running && !classroomRoundFinished) {
+          restart();
+        }
+      } else if (status === 'paused') {
+        pauseGame();
+        showClassroomOverlay('班級競賽模式', '老師已暫停', '請等待老師繼續或重新開始。');
+      }
+
+      updatePauseButton();
+    } catch (e) {
+      console.warn('classroom sync fail', e);
+    }
+  }
+
+  function startClassroomPolling(){
+    stopClassroomPolling();
+    classroomPollTimer = setInterval(syncClassroomState, 1000);
+    syncClassroomState();
   }
 
   async function setBest(){
@@ -196,6 +303,10 @@ const keyPositions = {};
         b.className = 'key control';
         b.textContent = '⏹ 結束';
         b.onclick = () => {
+          if (classroomMode) {
+            toast && toast('班級競賽中不能自行結束');
+            return;
+          }
           if (confirm('確定要結束本局遊戲嗎？')) {
             endAndShowLeader();
           }
@@ -204,6 +315,10 @@ const keyPositions = {};
         b.className = 'key control';
         b.textContent = '🔄 重來';
         b.onclick = () => {
+          if (classroomMode) {
+            toast && toast('班級競賽中請等待老師重新開始');
+            return;
+          }
           if (confirm('確定要重新開始嗎？目前分數會歸零。')) {
             restart();
           }
@@ -655,6 +770,10 @@ meteors.forEach(m => {
     updatePauseButton();
   }
   function toggleRun(){
+    if (classroomMode) {
+      toast && toast('班級競賽由老師控制');
+      return;
+    }
     running ? pauseGame() : startGame();
     updatePauseButton();
   }
@@ -724,6 +843,7 @@ async function endAndShowLeader(){
     running = false;
     clearInterval(timerId);
     gameEnded = true;
+    updatePauseButton();
 
     const dur = (LEVELS[level-1]?.duration) || 60;
     const elapsed = dur - Math.max(0, timeLeft);
@@ -795,11 +915,13 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     if(p){ p.classList.remove('show'); 
       p.setAttribute('hidden',''); 
     } 
-  if (leaderAutoRestart) {
-  leaderAutoRestart = false;
-  restart();
-}
-}
+    if (leaderAutoRestart) {
+      leaderAutoRestart = false;
+      if (!classroomMode) {
+        restart();
+      }
+    }
+  }
 
   async function loadClasses(){ try{ const resp=await API.getClasses(); const box=$('classList'); if(!box) return; box.innerHTML=""; resp.data.forEach(c=>{ const btn=document.createElement('button'); btn.className='tag'; btn.textContent=`${c.class}（${c.count}人，Top ${c.top}，Avg ${c.avg}）`; btn.onclick=()=>{ const cp=$('classPrefix'); if(cp){ cp.value=c.class; loadClassRank(); } }; box.appendChild(btn); }); }catch(e){ toast && toast('載入班級清單失敗'); } }
   async function loadAllRank(){ const limit=Number(($('lbLimit')?.value)||20); const tb=$('teacherLbBody'); if(!tb) return; tb.innerHTML=""; try{ const resp=await API.leaderboard(limit); tb.innerHTML=resp.data.map((r,i)=>`<tr><td style="padding:8px 10px">${i+1}</td><td style="padding:8px 10px">${r.sid}</td><td style="padding:8px 10px">${r.best}</td></tr>`).join(''); }catch(e){ tb.innerHTML=`<tr><td colspan="3" style="padding:8px 10px">讀取失敗：${e.message}</td></tr>`; } }
@@ -824,8 +946,15 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0; level=1;
     timeLeft=(LEVELS[level-1]?.duration)||60;
     setScore(); setTime(); meteors=[]; draw();
-// ✅ 登入後自動開始
-startGame();
+
+    await syncClassroomState();
+    if (classroomMode) {
+      startClassroomPolling();
+    } else {
+      hideClassroomOverlay();
+      setModeChip('模式：自由練習', false);
+      startGame();
+    }
 
   });
 
@@ -839,7 +968,7 @@ startGame();
   });
 
   // 初始化
-  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setBest(); draw(); updatePauseButton(); requestAnimationFrame(step);
+  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setBest(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
 });
 
 /* ===== Admin Clear Utilities (for game page) =====
