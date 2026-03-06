@@ -138,6 +138,28 @@ app.get("/api/leaderboard", async (req, res) => {
   res.json({ ok: true, data: list });
 });
 
+app.post("/api/student/heartbeat", async (req, res) => {
+  if (!requireDB(res)) return;
+  const { sid, score = 0, status = "online", classroom = false } = req.body || {};
+  if (!/^\d{5}$/.test(String(sid))) return res.status(400).json({ ok: false, error: "sid_invalid" });
+  const now = new Date();
+  await students.updateOne(
+    { sid: String(sid) },
+    {
+      $setOnInsert: { best: 0, createdAt: now },
+      $set: {
+        lastSeenAt: now,
+        currentScore: Number(score || 0),
+        onlineStatus: String(status || "online"),
+        inClassroomMode: !!classroom,
+        updatedAt: now
+      }
+    },
+    { upsert: true }
+  );
+  res.json({ ok: true, data: { sid: String(sid), lastSeenAt: now } });
+});
+
 app.get("/api/student/:sid", async (req, res) => {
   if (!requireDB(res)) return;
   const sid = req.params.sid;
@@ -157,6 +179,43 @@ app.get("/api/classes", async (_req, res) => {
   ];
   const data = await students.aggregate(pipeline).toArray();
   res.json({ ok: true, data });
+});
+
+app.get("/api/admin/online-students", adminAuth, async (req, res) => {
+  if (!requireDB(res)) return;
+  const classPrefix = String(req.query.classPrefix || "").trim();
+  const cutoff = new Date(Date.now() - 15000);
+  const filter = { lastSeenAt: { $gte: cutoff } };
+  if (/^\d{3}$/.test(classPrefix)) filter.sid = new RegExp("^" + classPrefix);
+
+  const list = await students
+    .find(filter, {
+      projection: { _id: 0, sid: 1, best: 1, currentScore: 1, onlineStatus: 1, inClassroomMode: 1, lastSeenAt: 1, updatedAt: 1 }
+    })
+    .sort({ sid: 1 })
+    .limit(200)
+    .toArray();
+
+  res.json({ ok: true, data: list });
+});
+
+app.get("/api/admin/live-leaderboard", adminAuth, async (req, res) => {
+  if (!requireDB(res)) return;
+  const classPrefix = String(req.query.classPrefix || "").trim();
+  const cutoff = new Date(Date.now() - 15000);
+  const limit = Math.min(Number(req.query.limit || 20), 100);
+  const filter = { lastSeenAt: { $gte: cutoff } };
+  if (/^\d{3}$/.test(classPrefix)) filter.sid = new RegExp("^" + classPrefix);
+
+  const list = await students
+    .find(filter, {
+      projection: { _id: 0, sid: 1, best: 1, currentScore: 1, onlineStatus: 1, inClassroomMode: 1, lastSeenAt: 1 }
+    })
+    .sort({ currentScore: -1, best: -1, sid: 1 })
+    .limit(limit)
+    .toArray();
+
+  res.json({ ok: true, data: list });
 });
 
 // ====== 教室競賽狀態（Mongo 優先；無 DB 時退回單機記憶體） ======
@@ -272,6 +331,19 @@ app.post("/api/admin/classroom/start", adminAuth, async (req, res) => {
   if (!/^\d{3}$/.test(classPrefix)) {
     return res.status(400).json({ ok:false, error:"class_prefix_invalid", got: classPrefix });
   }
+
+  if (classroomState.enabled && classroomState.classPrefix === classPrefix && classroomState.status === "paused") {
+    const state = await writeClassroomState({
+      enabled: true,
+      classPrefix,
+      status: "running",
+      countdownSec: 0,
+      startAt: null
+    });
+    console.log(`[classroom] resume class=${classPrefix} round=${state.roundId}`);
+    return res.json({ ok:true, data: { ...state, resumed: true } });
+  }
+
   const state = await writeClassroomState({
     enabled: true,
     classPrefix,

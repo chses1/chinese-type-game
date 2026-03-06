@@ -58,6 +58,17 @@ const API = {
   classroomState(){
     return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`);
   },
+  onlineStudents(classPrefix, token){
+    const qs = new URLSearchParams();
+    if (classPrefix) qs.set('classPrefix', classPrefix);
+    return jsonFetch(`${API_BASE}/admin/online-students?` + qs.toString(), { headers:{ 'x-teacher-token': token } });
+  },
+  liveLeaderboard(classPrefix, limit, token){
+    const qs = new URLSearchParams();
+    if (classPrefix) qs.set('classPrefix', classPrefix);
+    if (limit) qs.set('limit', limit);
+    return jsonFetch(`${API_BASE}/admin/live-leaderboard?` + qs.toString(), { headers:{ 'x-teacher-token': token } });
+  },
   classroomOpen(classPrefix, token){
     return jsonFetch(`${API_BASE}/admin/classroom/open`, {
       method:'POST',
@@ -97,6 +108,9 @@ const API = {
 
 
 let classroomTimer = null;
+let lastClassRankHtml = "";
+let lastOnlineHtml = "";
+let lastLiveHtml = "";
 
 function syncCcClassPrefix(v){
   if ($('ccClassPrefix')) $('ccClassPrefix').value = v || '';
@@ -120,6 +134,73 @@ function renderClassroomState(s){
   box.textContent = text;
 }
 
+function formatAgo(ts){
+  const t = new Date(ts || 0).getTime();
+  if (!t) return '—';
+  const diff = Math.max(0, Math.floor((Date.now() - t) / 1000));
+  if (diff < 1) return '剛剛';
+  if (diff < 60) return `${diff} 秒前`;
+  return `${Math.floor(diff / 60)} 分前`;
+}
+
+function renderBodyIfChanged(id, html, emptyColspan, emptyText){
+  const el = $(id);
+  if (!el) return;
+  const safeHtml = html || `<tr><td colspan="${emptyColspan}">${emptyText}</td></tr>`;
+  if (id === 'teacherLbBody') {
+    if (safeHtml === lastClassRankHtml) return;
+    lastClassRankHtml = safeHtml;
+  } else if (id === 'onlineStudentsBody') {
+    if (safeHtml === lastOnlineHtml) return;
+    lastOnlineHtml = safeHtml;
+  } else if (id === 'liveRankBody') {
+    if (safeHtml === lastLiveHtml) return;
+    lastLiveHtml = safeHtml;
+  }
+  el.innerHTML = safeHtml;
+}
+
+async function loadOnlineStudents(){
+  const token = getToken();
+  if (!token) return;
+  const p = ($('ccClassPrefix')?.value || $('classPrefix')?.value || '').trim();
+  try {
+    const resp = await API.onlineStudents(/^\d{3}$/.test(p) ? p : '', token);
+    const html = (resp.data || []).map((r, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${r.sid}</td>
+        <td>${Number(r.currentScore || 0)}</td>
+        <td>${r.onlineStatus || 'online'}</td>
+        <td>${formatAgo(r.lastSeenAt)}</td>
+      </tr>`).join('');
+    renderBodyIfChanged('onlineStudentsBody', html, 5, '目前沒有學生在線');
+  } catch (e) {
+    renderBodyIfChanged('onlineStudentsBody', `<tr><td colspan="5">讀取失敗：${e.message}</td></tr>`, 5, '');
+  }
+}
+
+async function loadLiveLeaderboard(){
+  const token = getToken();
+  if (!token) return;
+  const p = ($('ccClassPrefix')?.value || $('classPrefix')?.value || '').trim();
+  const limit = Number(($('lbLimit')?.value) || 20);
+  try {
+    const resp = await API.liveLeaderboard(/^\d{3}$/.test(p) ? p : '', limit, token);
+    const html = (resp.data || []).map((r, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${r.sid}</td>
+        <td>${Number(r.currentScore || 0)}</td>
+        <td>${Number(r.best || 0)}</td>
+        <td>${r.onlineStatus || 'online'}</td>
+      </tr>`).join('');
+    renderBodyIfChanged('liveRankBody', html, 5, '目前沒有即時競賽資料');
+  } catch (e) {
+    renderBodyIfChanged('liveRankBody', `<tr><td colspan="5">讀取失敗：${e.message}</td></tr>`, 5, '');
+  }
+}
+
 async function refreshClassroomState(){
   try {
     const resp = await API.classroomState();
@@ -128,8 +209,9 @@ async function refreshClassroomState(){
     if (s?.enabled && /^\d{3}$/.test(s.classPrefix)) {
       if ($('classPrefix')) $('classPrefix').value = s.classPrefix;
       syncCcClassPrefix(s.classPrefix);
-      await loadClassRank();
     }
+    await loadOnlineStudents();
+    await loadLiveLeaderboard();
   } catch (e) {
     console.warn('classroom state fail', e);
   }
@@ -212,12 +294,12 @@ async function loadClasses(){
 async function loadAllRank(){
   const limit = Number(($('lbLimit')?.value) || 20);
   const tb = $('teacherLbBody'); if (!tb) return;
-  tb.innerHTML = "";
   try {
     const resp = await API.leaderboard(limit);
-    tb.innerHTML = resp.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
+    const html = resp.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
+    renderBodyIfChanged('teacherLbBody', html, 3, '尚無資料');
   } catch (e) {
-    tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
+    renderBodyIfChanged('teacherLbBody', `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`, 3, '');
   }
 }
 
@@ -226,12 +308,12 @@ async function loadClassRank(){
   if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼（三碼，允許 0 開頭）'); return; }
   const limit = Number(($('lbLimit')?.value) || 20);
   const tb = $('teacherLbBody'); if (!tb) return;
-  tb.innerHTML = "";
   try {
     const resp = await API.leaderboard(limit, p);
-    tb.innerHTML = resp.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
+    const html = resp.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
+    renderBodyIfChanged('teacherLbBody', html, 3, '尚無資料');
   } catch (e) {
-    tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
+    renderBodyIfChanged('teacherLbBody', `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`, 3, '');
   }
 }
 

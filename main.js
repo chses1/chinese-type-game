@@ -26,6 +26,7 @@ const API = {
   getStudent(sid)  { return jsonFetch(`${API_BASE}/student/${sid}`); },
   getClasses()     { return jsonFetch(`${API_BASE}/classes`); },
   classroomState() { return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`); },
+  studentHeartbeat(payload){ return jsonFetch(`${API_BASE}/student/heartbeat`, { method:"POST", body:JSON.stringify(payload) }); },
 
   // ✅ 「刪除整筆」模式（含學號）
   adminClearClass(prefix, token){
@@ -148,6 +149,32 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let classroomLastRoundId = 0;
   let classroomCountdownEnd = 0;
   let classroomCurrentClass = '';
+  let classroomRoundStarted = false;
+  let heartbeatTimer = null;
+
+  async function sendHeartbeat(status='online'){
+    if (!me.sid) return;
+    try {
+      await API.studentHeartbeat({ sid: me.sid, score, status, classroom: classroomMode });
+    } catch (e) {
+      console.warn('heartbeat fail', e);
+    }
+  }
+
+  function startHeartbeat(){
+    stopHeartbeat();
+    heartbeatTimer = setInterval(() => {
+      sendHeartbeat(running ? 'playing' : 'online');
+    }, 2000);
+    sendHeartbeat(running ? 'playing' : 'online');
+  }
+
+  function stopHeartbeat(){
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
 
   const setUserChip=()=>$('userChip') && ($('userChip').textContent=me.sid?`${me.sid}`:'未登入');
   const setScore=()=>$('score') && ($('score').textContent=score);
@@ -228,6 +255,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       if (roundId !== classroomLastRoundId) {
         classroomLastRoundId = roundId;
         classroomRoundFinished = false;
+        classroomRoundStarted = false;
       }
 
       if (status === 'idle') {
@@ -241,7 +269,12 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       } else if (status === 'running') {
         hideClassroomOverlay();
         if (!running && !classroomRoundFinished) {
-          restart();
+          if (classroomRoundStarted) {
+            resumeCurrentGame();
+          } else {
+            restart();
+            classroomRoundStarted = true;
+          }
         }
       } else if (status === 'paused') {
         pauseGame();
@@ -762,6 +795,7 @@ meteors.forEach(m => {
     running = true;
     updatePauseButton();
     ticker();
+    sendHeartbeat('playing');
   }
   function pauseGame(){
     running = false;
@@ -779,6 +813,16 @@ meteors.forEach(m => {
 
     draw();
     updatePauseButton();
+    sendHeartbeat('paused');
+  }
+
+  function resumeCurrentGame(){
+    if (!me.sid || gameEnded) return;
+    running = true;
+    updatePauseButton();
+    ticker();
+    sendHeartbeat('playing');
+    sendHeartbeat('playing');
   }
   function toggleRun(){
     if (classroomMode) {
@@ -890,6 +934,7 @@ async function endAndShowLeader(){
     try {
       if (typeof classroomMode !== 'undefined' && classroomMode) {
         classroomRoundFinished = true;
+        sendHeartbeat('finished');
         if (typeof showClassroomOverlay === 'function') {
           showClassroomOverlay('本回合結束', '請等待老師下一次開始', '你可以先看成績，不能自行重開。');
         }
@@ -903,7 +948,9 @@ async function endAndShowLeader(){
     gameEnded = false; // 重置結束狀態
     level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0;
     timeLeft=(LEVELS[level-1]?.duration)||60; setScore(); setTime();
-    meteors=[]; draw(); closeResult(); startGame();
+    meteors=[]; draw(); closeResult();
+    if (classroomMode) classroomRoundStarted = true;
+    startGame();
     updatePauseButton();
   }
 
@@ -958,6 +1005,7 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     timeLeft=(LEVELS[level-1]?.duration)||60;
     setScore(); setTime(); meteors=[]; draw();
 
+    startHeartbeat();
     startClassroomPolling();
     await syncClassroomState();
     if (!classroomMode) {
@@ -977,7 +1025,7 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
 
   // 初始化
   buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setBest(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
-  window.addEventListener('beforeunload', stopClassroomPolling);
+  window.addEventListener('beforeunload', () => { stopClassroomPolling(); stopHeartbeat(); });
 });
 
 /* ===== Admin Clear Utilities (for game page) =====
