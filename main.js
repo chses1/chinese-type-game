@@ -162,7 +162,7 @@ const keyPositions = {};
     ['ㄅ','ㄉ','ˇ','ˋ','ㄓ','ˊ','˙','ㄚ','ㄞ','ㄢ','ㄦ'],
     ['ㄆ','ㄊ','ㄍ','ㄐ','ㄔ','ㄗ','ㄧ','ㄛ','ㄟ','ㄣ','__PAUSE__'],
     ['ㄇ','ㄋ','ㄎ','ㄑ','ㄕ','ㄘ','ㄨ','ㄜ','ㄠ','ㄤ','__END__'],
-    ['ㄈ','ㄌ','ㄏ','ㄒ','ㄖ','ㄙ','ㄩ','ㄝ','ㄡ','ㄥ',null]
+    ['ㄈ','ㄌ','ㄏ','ㄒ','ㄖ','ㄙ','ㄩ','ㄝ','ㄡ','ㄥ','__RESTART__']
   ];
 
   const kbd=$('kbd'); if(!kbd) return;
@@ -190,6 +190,10 @@ const keyPositions = {};
         b.className = 'key control';
         b.textContent = '⏹ 結束';
         b.onclick = () => endAndShowLeader();
+      } else if (ch === '__RESTART__') {
+        b.className = 'key control';
+        b.textContent = '🔄 重來';
+        b.onclick = () => confirmRestart();
       } else {
         // 一般注音鍵
         b.className='key '+(ZHUYIN.includes(ch)?keyClass(ch):'');
@@ -610,7 +614,22 @@ meteors.forEach(m => {
   }
 
   function startGame(){ if(!me.sid){ toast && toast('請先登入'); return; } running=true; ticker(); }
-  function pauseGame(){ running=false; }
+  function pauseGame(){
+    running = false;
+
+    // ✅ 防作弊：暫停時清空所有隕石，重新開始後重新派題
+    meteors = [];
+
+    // 連擊歸零
+    combo = 0;
+    maxCombo = 0;
+
+    // 清除暫存特效，避免學生利用停留畫面判讀
+    lasers.length = 0;
+    explosions.length = 0;
+
+    draw();
+  }
   function toggleRun(){ running?pauseGame():startGame(); }
 // ✅ 結束：顯示排行榜後「自動重新開始」
 // 做法：先停下遊戲 → 送出最佳分數 → 打開排行榜 → 當排行榜關閉時重開
@@ -677,7 +696,18 @@ async function endAndShowLeader(){
     timeLeft = (LEVELS[level-1]?.duration) || 60; setTime(); draw();
   }
 
+  function confirmRestart(){
+    if (!me.sid) { toast && toast('請先登入'); return; }
+    const ok = confirm('確定要重新開始嗎？
+目前分數會歸零，但不會登出帳號。');
+    if (!ok) return;
+    restart();
+  }
+
   function restart(){
+    running = false;
+    clearInterval(timerId);
+    leaderAutoRestart = false;
     level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0;
     timeLeft=(LEVELS[level-1]?.duration)||60; setScore(); setTime();
     meteors=[]; draw(); closeResult(); startGame();
