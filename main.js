@@ -108,6 +108,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let maxCombo = 0;
   const explosions = []; // {x,y,t0,life}
   const lasers = []; // {x1,y1,x2,y2,t0,life,kind}
+  const earthHits = []; // { t0, life } 地球被擊中閃光
 
   // 取得按鍵在 canvas 的發射位置（抓不到就用畫面底部中間備援）
   function getKeyOrigin(ch){
@@ -458,17 +459,27 @@ function spawn(){
     ctx.restore();
   }
 
-  // ✅ NEW: Combo 火焰提示（連擊 ≥ 5 才顯示）
-  if (combo >= 5) {
+  // 地球被擊中閃爍特效
+  for (let i = earthHits.length - 1; i >= 0; i--) {
+    const hit = earthHits[i];
+    const t = (now - hit.t0) / hit.life;
+    if (t >= 1) {
+      earthHits.splice(i, 1);
+      continue;
+    }
+
+    const alpha = (1 - t) * 0.45;
+
     ctx.save();
-    ctx.globalAlpha = 0.95;
-    ctx.font = 'bold 64px system-ui';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = 'rgba(255,165,0,0.95)';
-    ctx.fillText(`🔥 COMBO ${combo} (x2)`, W * 0.5, 18);
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = `rgba(255,120,120,${alpha * 0.65})`;
+    ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
+
+  // 已移除畫面上方的 COMBO 顯示，避免與擊中提示重複
 }
 
   function calcPoints(rtMs){
@@ -586,6 +597,11 @@ meteors.forEach(m => {
     score = Math.max(0, score - 1);
     wrong++;
     combo = 0; // ✅ 沒打到也算斷連擊
+
+    // 🌍 隕石撞到地球：畫面閃爍 + 輕微震動
+    earthHits.push({ t0: performance.now(), life: 220 });
+    canvas.style.transform = `translate(${Math.random() < 0.5 ? -4 : 4}px, ${Math.random() < 0.5 ? -2 : 2}px)`;
+    setTimeout(() => { canvas.style.transform = ''; }, 90);
   }
 }
       draw();
