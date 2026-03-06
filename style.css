@@ -134,13 +134,7 @@ header .chip {
 .key.medial{background:#154a3a;border-color:#23d39b;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 0 0 2px rgba(35,211,155,.25)}
 .key.yunmu{background:#4a2b3c;border-color:#ff8cc8;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 0 0 2px rgba(255,140,200,.25)}
 /* 聲調鍵（ˇˋˊ˙）：視覺上跟聲母同一區，避免學生困惑 */
-.key.tone{
-  background:#133468;
-  border-color:#2b8cff;
-  box-shadow:inset 0 -2px 0 rgba(0,0,0,.25),0 0 0 2px rgba(43,140,255,.25);
-  font-size:100px;
-  font-weight:bold;
-}
+.key.tone{font-size:28px;}
 
 .legend .dot{display:inline-block;width:.9em;height:.9em;border-radius:50%;margin-right:.35em;vertical-align:-.12em}
 .legend .dot.sm{background:#2b8cff}
