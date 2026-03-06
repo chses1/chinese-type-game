@@ -3,19 +3,32 @@ import express from "express";
 import cors from "cors";
 import { MongoClient } from "mongodb";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-// 目錄定位：本檔在 /server，靜態檔案在專案根目錄
+// 目錄定位：同時支援兩種放法
+// 1. server.js 放在專案根目錄
+// 2. server.js 放在 /server 子資料夾
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT_DIR   = path.resolve(__dirname, "..");   // ← 專案根目錄
+const ROOT_DIR   = ["index.html", "teacher.html", "main.js", "style.css"].every(name => fs.existsSync(path.join(__dirname, name)))
+  ? __dirname
+  : path.resolve(__dirname, "..");
 const SERVER_DIR = __dirname;
 
 const app = express();
 app.use(express.json());
+
+// 避免教室競賽狀態被瀏覽器或代理快取，造成老師已開啟但前端仍顯示未開啟
+app.use("/api", (_req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+  next();
+});
 
 // CORS（有需要再設）
 if (process.env.CORS_ORIGIN) {
@@ -32,7 +45,7 @@ app.use(express.static(ROOT_DIR));
 const mongoUri = process.env.MONGODB_URI;
 const dbName   = process.env.DB_NAME || "zhuyin";
 
-let client, db, students;
+let client, db, students, classroomStates;
 
 async function initMongo() {
   if (!mongoUri) {
@@ -44,8 +57,26 @@ async function initMongo() {
     await client.connect();
     db       = client.db(dbName);
     students = db.collection("students");
+    classroomStates = db.collection("classroom_states");
     await students.createIndex({ sid: 1 }, { unique: true });
     await students.createIndex({ best: -1, updatedAt: -1 });
+    await classroomStates.createIndex({ key: 1 }, { unique: true });
+    await classroomStates.updateOne(
+      { key: "global" },
+      {
+        $setOnInsert: {
+          key: "global",
+          enabled: false,
+          classPrefix: "",
+          status: "idle",
+          roundId: 0,
+          updatedAt: Date.now(),
+          startAt: null,
+          countdownSec: 0
+        }
+      },
+      { upsert: true }
+    );
     console.log("[mongo] connected:", dbName);
   } catch (err) {
     console.error("[mongo] connect failed:", err.message);
@@ -128,6 +159,50 @@ app.get("/api/classes", async (_req, res) => {
   res.json({ ok: true, data });
 });
 
+// ====== 教室競賽狀態（Mongo 優先；無 DB 時退回單機記憶體） ======
+const classroomState = {
+  enabled: false,
+  classPrefix: "",
+  status: "idle", // idle | countdown | running | paused
+  roundId: 0,
+  updatedAt: Date.now(),
+  startAt: null,
+  countdownSec: 0
+};
+
+async function readClassroomState() {
+  if (classroomStates) {
+    const doc = await classroomStates.findOne({ key: "global" }, { projection: { _id: 0, key: 0 } });
+    if (doc) Object.assign(classroomState, doc);
+  }
+  return classroomState;
+}
+
+async function writeClassroomState(patch = {}) {
+  Object.assign(classroomState, patch, { updatedAt: Date.now() });
+  if (classroomStates) {
+    await classroomStates.updateOne(
+      { key: "global" },
+      { $set: { key: "global", ...classroomState } },
+      { upsert: true }
+    );
+  }
+  return classroomState;
+}
+
+async function normalizeClassroomState() {
+  const s = await readClassroomState();
+  if (s.enabled && s.status === "countdown" && s.startAt && Date.now() >= s.startAt) {
+    await writeClassroomState({ status: "running" });
+  }
+  return classroomState;
+}
+
+app.get("/api/classroom/state", async (_req, res) => {
+  const s = await normalizeClassroomState();
+  res.json({ ok: true, data: { ...s, now: Date.now() } });
+});
+
 // ====== 教師權限 ======
 const TEACHER_TOKEN = process.env.TEACHER_TOKEN || "1070";
 function adminAuth(req, res, next) {
@@ -171,6 +246,82 @@ app.post("/api/admin/clear-all", adminAuth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ ok:false, error:e.message });
   }
+});
+
+// ====== 教室競賽控制 API ======
+app.post("/api/admin/classroom/open", adminAuth, async (req, res) => {
+  const classPrefix = String(req.body?.classPrefix || "").trim();
+  if (!/^\d{3}$/.test(classPrefix)) {
+    return res.status(400).json({ ok:false, error:"class_prefix_invalid", got: classPrefix });
+  }
+  const state = await writeClassroomState({
+    enabled: true,
+    classPrefix,
+    status: "idle",
+    startAt: null,
+    countdownSec: 0
+  });
+  console.log(`[classroom] open class=${classPrefix}`);
+  res.json({ ok:true, data: { ...state } });
+});
+
+app.post("/api/admin/classroom/start", adminAuth, async (req, res) => {
+  await readClassroomState();
+  const classPrefix = String(req.body?.classPrefix || classroomState.classPrefix || "").trim();
+  const countdownSec = Math.max(1, Math.min(Number(req.body?.countdownSec || 3), 10));
+  if (!/^\d{3}$/.test(classPrefix)) {
+    return res.status(400).json({ ok:false, error:"class_prefix_invalid", got: classPrefix });
+  }
+  const state = await writeClassroomState({
+    enabled: true,
+    classPrefix,
+    status: "countdown",
+    countdownSec,
+    startAt: Date.now() + countdownSec * 1000,
+    roundId: Number(classroomState.roundId || 0) + 1
+  });
+  console.log(`[classroom] start class=${classPrefix} countdown=${countdownSec}s round=${state.roundId}`);
+  res.json({ ok:true, data: { ...state } });
+});
+
+app.post("/api/admin/classroom/pause", adminAuth, async (_req, res) => {
+  const current = await normalizeClassroomState();
+  if (!current.enabled) return res.status(400).json({ ok:false, error:"classroom_not_open" });
+  const state = await writeClassroomState({
+    status: "paused",
+    startAt: null,
+    countdownSec: 0
+  });
+  console.log(`[classroom] pause class=${state.classPrefix}`);
+  res.json({ ok:true, data: { ...state } });
+});
+
+app.post("/api/admin/classroom/restart", adminAuth, async (req, res) => {
+  await readClassroomState();
+  const countdownSec = Math.max(1, Math.min(Number(req.body?.countdownSec || 3), 10));
+  if (!classroomState.enabled || !/^\d{3}$/.test(classroomState.classPrefix)) {
+    return res.status(400).json({ ok:false, error:"classroom_not_open" });
+  }
+  const state = await writeClassroomState({
+    status: "countdown",
+    countdownSec,
+    startAt: Date.now() + countdownSec * 1000,
+    roundId: Number(classroomState.roundId || 0) + 1
+  });
+  console.log(`[classroom] restart class=${state.classPrefix} countdown=${countdownSec}s round=${state.roundId}`);
+  res.json({ ok:true, data: { ...state } });
+});
+
+app.post("/api/admin/classroom/close", adminAuth, async (_req, res) => {
+  const state = await writeClassroomState({
+    enabled: false,
+    classPrefix: "",
+    status: "idle",
+    startAt: null,
+    countdownSec: 0
+  });
+  console.log(`[classroom] close`);
+  res.json({ ok:true, data: { ...state } });
 });
 
 // API 404
