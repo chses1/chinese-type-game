@@ -318,20 +318,15 @@ function spawn(){
     // ✅ 修正：圖檔本身已經有固定方向火焰
     // Safari / iPad 對 drawImage 負寬度翻轉支援不穩，改用 scale(-1, 1) 明確翻轉
     const flipX = (m.vx || 0) > 0; // 往右飛 → 需要水平翻轉，讓火焰留在後方
-
-    // ✅ 視覺中心點（Visual Center）校正：
-    // 圖檔左側有火焰拖尾，幾何中心不等於石頭本體中心。
-    // 以前用 xOffset/yOffset 去「移動文字」，現在改成「移動圖片」，讓 (0,0) 就是石頭中心。
-    // 這樣翻轉時文字不會跑掉，永遠保持置中。
-    const IMG_SHIFT_X = -0.08 * size; // 往左移一點，讓石頭本體回到中心
-    const IMG_SHIFT_Y = -0.15 * size; // 往上移一點，讓石頭本體回到中心
-
     if (ok) {
-      // 只翻轉圖片，不翻轉文字：用 save/restore 把翻轉限制在 drawImage 這一小段
-      ctx.save();
-      if (flipX) ctx.scale(-1, 1);
-      ctx.drawImage(meteorImgs[key], -size/2 + IMG_SHIFT_X, -size/2 + IMG_SHIFT_Y, size, size);
-      ctx.restore();
+      if (flipX) {
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(meteorImgs[key], -size/2, -size/2, size, size);
+        ctx.restore();
+      } else {
+        ctx.drawImage(meteorImgs[key], -size/2, -size/2, size, size);
+      }
     } else {
       // fallback（圖片沒載到時）
       ctx.fillStyle = (m.type==='gold') ? '#f59e0b'
@@ -361,16 +356,19 @@ function spawn(){
     }
 
     // 注音字
+    // ✅ 修正：翻轉圖片時，文字的「水平微調」也要一起鏡像，才能保持在隕石正中心
+    // 你原本的 xOffset = -size*0.08 是為了配合「未翻轉」圖檔的視覺中心
+    // 當 flipX=true（往右飛、圖片水平翻轉）時，xOffset 需要改成 +size*0.08
     ctx.font='bold 100px system-ui';
     ctx.textAlign='center';
     ctx.textBaseline='middle';
     ctx.lineWidth=5;
     ctx.strokeStyle='rgba(0,0,0,.6)';
-
-    // ✅ 視覺中心點校正後，文字直接畫在 (0,0) 就是隕石本體中心
-    ctx.strokeText(m.label, 0, 0);
+    const xOffset = ((flipX ? 1 : -1) * size * 0.08);
+    const yOffset = (size * 0.15);
+    ctx.strokeText(m.label, xOffset, yOffset);
     ctx.fillStyle='#fff';
-    ctx.fillText(m.label, 0, 0);
+    ctx.fillText(m.label, xOffset, yOffset);
 
     ctx.restore();
   });
