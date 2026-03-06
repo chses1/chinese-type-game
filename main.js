@@ -202,6 +202,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       const isMine = !!(s.enabled && s.classPrefix === myClass);
 
       if (!isMine) {
+        const wasClassroomMode = classroomMode;
         classroomMode = false;
         classroomCurrentClass = '';
         classroomCountdownEnd = 0;
@@ -209,6 +210,9 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
         hideClassroomOverlay();
         setModeChip('模式：自由練習', false);
         updatePauseButton();
+        if (me.sid && (!wasClassroomMode || !running) && !gameEnded) {
+          enterFreePracticeMode();
+        }
         return;
       }
 
@@ -253,6 +257,12 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     stopClassroomPolling();
     classroomPollTimer = setInterval(syncClassroomState, 1000);
     syncClassroomState();
+  }
+
+  function enterFreePracticeMode(){
+    hideClassroomOverlay();
+    setModeChip('模式：自由練習', false);
+    if (!running && !gameEnded) startGame();
   }
 
   async function setBest(){
@@ -947,13 +957,10 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     timeLeft=(LEVELS[level-1]?.duration)||60;
     setScore(); setTime(); meteors=[]; draw();
 
+    startClassroomPolling();
     await syncClassroomState();
-    if (classroomMode) {
-      startClassroomPolling();
-    } else {
-      hideClassroomOverlay();
-      setModeChip('模式：自由練習', false);
-      startGame();
+    if (!classroomMode) {
+      enterFreePracticeMode();
     }
 
   });
@@ -969,6 +976,7 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
 
   // 初始化
   buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setBest(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
+  window.addEventListener('beforeunload', stopClassroomPolling);
 });
 
 /* ===== Admin Clear Utilities (for game page) =====

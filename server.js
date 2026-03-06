@@ -32,7 +32,7 @@ app.use(express.static(ROOT_DIR));
 const mongoUri = process.env.MONGODB_URI;
 const dbName   = process.env.DB_NAME || "zhuyin";
 
-let client, db, students;
+let client, db, students, classroomStates;
 
 async function initMongo() {
   if (!mongoUri) {
@@ -44,8 +44,26 @@ async function initMongo() {
     await client.connect();
     db       = client.db(dbName);
     students = db.collection("students");
+    classroomStates = db.collection("classroom_states");
     await students.createIndex({ sid: 1 }, { unique: true });
     await students.createIndex({ best: -1, updatedAt: -1 });
+    await classroomStates.createIndex({ key: 1 }, { unique: true });
+    await classroomStates.updateOne(
+      { key: "global" },
+      {
+        $setOnInsert: {
+          key: "global",
+          enabled: false,
+          classPrefix: "",
+          status: "idle",
+          roundId: 0,
+          updatedAt: Date.now(),
+          startAt: null,
+          countdownSec: 0
+        }
+      },
+      { upsert: true }
+    );
     console.log("[mongo] connected:", dbName);
   } catch (err) {
     console.error("[mongo] connect failed:", err.message);
@@ -128,7 +146,7 @@ app.get("/api/classes", async (_req, res) => {
   res.json({ ok: true, data });
 });
 
-// ====== 教室競賽狀態（單機記憶體版） ======
+// ====== 教室競賽狀態（Mongo 優先；無 DB 時退回單機記憶體） ======
 const classroomState = {
   enabled: false,
   classPrefix: "",
@@ -139,16 +157,36 @@ const classroomState = {
   countdownSec: 0
 };
 
-function normalizeClassroomState() {
-  if (classroomState.enabled && classroomState.status === "countdown" && classroomState.startAt && Date.now() >= classroomState.startAt) {
-    classroomState.status = "running";
-    classroomState.updatedAt = Date.now();
+async function readClassroomState() {
+  if (classroomStates) {
+    const doc = await classroomStates.findOne({ key: "global" }, { projection: { _id: 0, key: 0 } });
+    if (doc) Object.assign(classroomState, doc);
   }
   return classroomState;
 }
 
-app.get("/api/classroom/state", (_req, res) => {
-  const s = normalizeClassroomState();
+async function writeClassroomState(patch = {}) {
+  Object.assign(classroomState, patch, { updatedAt: Date.now() });
+  if (classroomStates) {
+    await classroomStates.updateOne(
+      { key: "global" },
+      { $set: { key: "global", ...classroomState } },
+      { upsert: true }
+    );
+  }
+  return classroomState;
+}
+
+async function normalizeClassroomState() {
+  const s = await readClassroomState();
+  if (s.enabled && s.status === "countdown" && s.startAt && Date.now() >= s.startAt) {
+    await writeClassroomState({ status: "running" });
+  }
+  return classroomState;
+}
+
+app.get("/api/classroom/state", async (_req, res) => {
+  const s = await normalizeClassroomState();
   res.json({ ok: true, data: { ...s, now: Date.now() } });
 });
 
@@ -203,62 +241,69 @@ app.post("/api/admin/classroom/open", adminAuth, async (req, res) => {
   if (!/^\d{3}$/.test(classPrefix)) {
     return res.status(400).json({ ok:false, error:"class_prefix_invalid", got: classPrefix });
   }
-  classroomState.enabled = true;
-  classroomState.classPrefix = classPrefix;
-  classroomState.status = "idle";
-  classroomState.startAt = null;
-  classroomState.countdownSec = 0;
-  classroomState.updatedAt = Date.now();
-  res.json({ ok:true, data: { ...classroomState } });
+  const state = await writeClassroomState({
+    enabled: true,
+    classPrefix,
+    status: "idle",
+    startAt: null,
+    countdownSec: 0
+  });
+  res.json({ ok:true, data: { ...state } });
 });
 
 app.post("/api/admin/classroom/start", adminAuth, async (req, res) => {
+  await readClassroomState();
   const classPrefix = String(req.body?.classPrefix || classroomState.classPrefix || "").trim();
   const countdownSec = Math.max(1, Math.min(Number(req.body?.countdownSec || 3), 10));
   if (!/^\d{3}$/.test(classPrefix)) {
     return res.status(400).json({ ok:false, error:"class_prefix_invalid", got: classPrefix });
   }
-  classroomState.enabled = true;
-  classroomState.classPrefix = classPrefix;
-  classroomState.status = "countdown";
-  classroomState.countdownSec = countdownSec;
-  classroomState.startAt = Date.now() + countdownSec * 1000;
-  classroomState.roundId += 1;
-  classroomState.updatedAt = Date.now();
-  res.json({ ok:true, data: { ...classroomState } });
+  const state = await writeClassroomState({
+    enabled: true,
+    classPrefix,
+    status: "countdown",
+    countdownSec,
+    startAt: Date.now() + countdownSec * 1000,
+    roundId: Number(classroomState.roundId || 0) + 1
+  });
+  res.json({ ok:true, data: { ...state } });
 });
 
 app.post("/api/admin/classroom/pause", adminAuth, async (_req, res) => {
-  if (!classroomState.enabled) return res.status(400).json({ ok:false, error:"classroom_not_open" });
-  normalizeClassroomState();
-  classroomState.status = "paused";
-  classroomState.startAt = null;
-  classroomState.countdownSec = 0;
-  classroomState.updatedAt = Date.now();
-  res.json({ ok:true, data: { ...classroomState } });
+  const current = await normalizeClassroomState();
+  if (!current.enabled) return res.status(400).json({ ok:false, error:"classroom_not_open" });
+  const state = await writeClassroomState({
+    status: "paused",
+    startAt: null,
+    countdownSec: 0
+  });
+  res.json({ ok:true, data: { ...state } });
 });
 
 app.post("/api/admin/classroom/restart", adminAuth, async (req, res) => {
+  await readClassroomState();
   const countdownSec = Math.max(1, Math.min(Number(req.body?.countdownSec || 3), 10));
   if (!classroomState.enabled || !/^\d{3}$/.test(classroomState.classPrefix)) {
     return res.status(400).json({ ok:false, error:"classroom_not_open" });
   }
-  classroomState.status = "countdown";
-  classroomState.countdownSec = countdownSec;
-  classroomState.startAt = Date.now() + countdownSec * 1000;
-  classroomState.roundId += 1;
-  classroomState.updatedAt = Date.now();
-  res.json({ ok:true, data: { ...classroomState } });
+  const state = await writeClassroomState({
+    status: "countdown",
+    countdownSec,
+    startAt: Date.now() + countdownSec * 1000,
+    roundId: Number(classroomState.roundId || 0) + 1
+  });
+  res.json({ ok:true, data: { ...state } });
 });
 
 app.post("/api/admin/classroom/close", adminAuth, async (_req, res) => {
-  classroomState.enabled = false;
-  classroomState.classPrefix = "";
-  classroomState.status = "idle";
-  classroomState.startAt = null;
-  classroomState.countdownSec = 0;
-  classroomState.updatedAt = Date.now();
-  res.json({ ok:true, data: { ...classroomState } });
+  const state = await writeClassroomState({
+    enabled: false,
+    classPrefix: "",
+    status: "idle",
+    startAt: null,
+    countdownSec: 0
+  });
+  res.json({ ok:true, data: { ...state } });
 });
 
 // API 404
