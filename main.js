@@ -142,6 +142,11 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const setScore=()=>$('score') && ($('score').textContent=score);
   const setTime =()=>$('time') && ($('time').textContent=timeLeft);
 
+  function updatePauseButton(){
+    const btn = document.querySelector('#kbd .key.control');
+    if (btn) btn.textContent = running ? '⏸ 暫停' : '▶️ 開始';
+  }
+
   async function setBest(){
     const b = $('best');
     if (!b || !me.sid) return;
@@ -184,16 +189,24 @@ const keyPositions = {};
       // 控制鍵
       if (ch === '__PAUSE__') {
         b.className = 'key control';
-        b.textContent = '⏸ 暫停';
+        b.textContent = '▶️ 開始';
         b.onclick = () => toggleRun();
       } else if (ch === '__END__') {
         b.className = 'key control';
         b.textContent = '⏹ 結束';
-        b.onclick = () => endAndShowLeader();
+        b.onclick = () => {
+          if (confirm('確定要結束本局遊戲嗎？')) {
+            endAndShowLeader();
+          }
+        };
       } else if (ch === '__RESTART__') {
         b.className = 'key control';
         b.textContent = '🔄 重來';
-        b.onclick = () => restart();
+        b.onclick = () => {
+          if (confirm('確定要重新開始嗎？目前分數會歸零。')) {
+            restart();
+          }
+        };
       } else {
         // 一般注音鍵
         b.className='key '+(ZHUYIN.includes(ch)?keyClass(ch):'');
@@ -613,7 +626,15 @@ meteors.forEach(m => {
     requestAnimationFrame(step);
   }
 
-  function startGame(){ if(!me.sid){ toast && toast('請先登入'); return; } running=true; ticker(); }
+  function startGame(){
+    if(!me.sid){
+      toast && toast('請先登入');
+      return;
+    }
+    running = true;
+    updatePauseButton();
+    ticker();
+  }
   function pauseGame(){
     running = false;
 
@@ -629,8 +650,12 @@ meteors.forEach(m => {
     explosions.length = 0;
 
     draw();
+    updatePauseButton();
   }
-  function toggleRun(){ running?pauseGame():startGame(); }
+  function toggleRun(){
+    running ? pauseGame() : startGame();
+    updatePauseButton();
+  }
 // ✅ 結束：顯示排行榜後「自動重新開始」
 // 做法：先停下遊戲 → 送出最佳分數 → 打開排行榜 → 當排行榜關閉時重開
 let leaderAutoRestart = false;
@@ -704,6 +729,7 @@ async function endAndShowLeader(){
     level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0;
     timeLeft=(LEVELS[level-1]?.duration)||60; setScore(); setTime();
     meteors=[]; draw(); closeResult(); startGame();
+    updatePauseButton();
   }
 
   // 排行榜（教師按鈕在遊戲頁也可用）
@@ -769,7 +795,7 @@ startGame();
   });
 
   // 初始化
-  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setBest(); draw(); requestAnimationFrame(step);
+  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setBest(); draw(); updatePauseButton(); requestAnimationFrame(step);
 });
 
 /* ===== Admin Clear Utilities (for game page) =====
