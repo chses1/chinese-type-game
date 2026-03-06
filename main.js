@@ -236,9 +236,12 @@ function spawn(){
   if (!keyPositions[targetKey]) return;
   const target = keyPositions[targetKey];
 
-  // ✅ NEW: 隨機從左/右側出現
-  const fromLeft = Math.random() < 0.5;
-  const startX = fromLeft ? -100 : W + 100;
+  // ✅ NEW: 掉落方向規則（避免距離太短來不及按）
+  // - 左邊的「聲母」(SHENGMU) → 從右側出現，飛向左側鍵盤區
+  // - 右邊的「韻母/介音/聲調」→ 從左側出現，飛向右側鍵盤區
+  const fromLeft = !SHENGMU.has(label); // 非聲母 → 視為右側群組 → 從左邊出現
+
+  const startX = fromLeft ? -60 : W + 60;
   const startY = -80;
 
   const targetX = target.x;
@@ -268,10 +271,7 @@ function spawn(){
     type,
     hp,
     sizeMul,
-    born: performance.now(),
-    // ✅ NEW: 旋轉參數
-    rot: Math.random() * Math.PI,
-    rotSpeed: (Math.random() - 0.5) * 0.10
+    born: performance.now()
   });
 }
   function drawBackground(){
@@ -303,12 +303,6 @@ function spawn(){
 
     ctx.save();
     ctx.translate(m.x, m.y);
-
-    // ✅ NEW: 旋轉
-    if (typeof m.rot === 'number' && typeof m.rotSpeed === 'number') {
-      m.rot += m.rotSpeed;
-      ctx.rotate(m.rot);
-    }
 
     const baseSize = 300;
     const size = baseSize * (m.sizeMul || 1);
@@ -529,14 +523,18 @@ meteors.forEach(m => {
 });
       for (let i = meteors.length - 1; i >= 0; i--) {
   const m = meteors[i];
-  const outBottom = m.y > H + 60;
-  const outLeft   = m.x < -80;
 
-  if (outBottom || outLeft) {
+  // ✅ 修正：左右兩側出現時，不要「一出生就被當作離開畫面」刪掉
+  // 只有當隕石真的往左飛且超出左界，或往右飛且超出右界，才算漏掉
+  const outBottom = m.y > H + 60;
+  const outLeft   = (m.vx || 0) < 0 && m.x < -120;
+  const outRight  = (m.vx || 0) > 0 && m.x > W + 120;
+
+  if (outBottom || outLeft || outRight) {
     meteors.splice(i, 1);
     score = Math.max(0, score - 1);
     wrong++;
-    combo = 0; // ✅ NEW: 沒打到也算斷連擊
+    combo = 0; // ✅ 沒打到也算斷連擊
   }
 }
       draw();
