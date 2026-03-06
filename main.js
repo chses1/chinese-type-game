@@ -287,7 +287,22 @@ function spawn(){
   const isSlow = now < slowUntil;
 
   meteors.forEach(m=>{
-    // ✅ NEW: 隕石拖尾（流星感）
+    // ✅ NEW: 隕石拖尾（流星感）— 依「實際移動方向」繪製（左右側都一致）
+    // 注意：m.vx/m.vy 在 step() 會再乘上 2*f*slow，所以這裡用同一套倍率，避免視覺方向不一致
+    const f = 1 + 0.08 * (level - 1);
+    const slow = (performance.now() < slowUntil) ? SLOW_FACTOR : 1;
+    const evx = (m.vx || 0) * 2 * f * slow;
+    const evy = (m.vy || 0) * 2 * f * slow;
+
+    // 取單位方向（避免速度太小導致尾巴方向怪）
+    const vlen = Math.hypot(evx, evy) || 1;
+    const nx = evx / vlen;
+    const ny = evy / vlen;
+
+    const tailLen = 120; // 尾巴長度（想更短可改 80~100）
+    const sx = m.x - nx * tailLen;
+    const sy = m.y - ny * tailLen;
+
     ctx.save();
     ctx.globalAlpha = 0.35;
     ctx.lineWidth = 10;
@@ -296,7 +311,7 @@ function spawn(){
                    : (m.type === 'boss') ? 'rgba(255,120,120,0.35)'
                    : 'rgba(255,255,255,0.28)';
     ctx.beginPath();
-    ctx.moveTo(m.x - (m.vx || 0) * 28, m.y - (m.vy || 0) * 28);
+    ctx.moveTo(sx, sy);
     ctx.lineTo(m.x, m.y);
     ctx.stroke();
     ctx.restore();
@@ -332,8 +347,15 @@ function spawn(){
     const key = (m.type in meteorImgs) ? m.type : 'normal';
     const ok = imgReady[key];
 
+    // ✅ 圖檔本身帶方向性拖尾：當隕石往「右」飛時，水平翻轉圖檔，讓拖尾永遠在後方
+    const flipX = (m.vx || 0) > 0; // 往右飛 → 翻轉
     if (ok) {
-      ctx.drawImage(meteorImgs[key], -size/2, -size/2, size, size);
+      if (flipX) {
+        // 用「負寬度」翻轉，不影響後續文字（注音）方向
+        ctx.drawImage(meteorImgs[key], size/2, -size/2, -size, size);
+      } else {
+        ctx.drawImage(meteorImgs[key], -size/2, -size/2, size, size);
+      }
     } else {
       // fallback（圖片沒載到時）
       ctx.fillStyle = (m.type==='gold') ? '#f59e0b'
