@@ -39,29 +39,6 @@ const API = {
       headers:{ "x-teacher-token": token },
       body: JSON.stringify({ mode: "delete" })
     });
-
-    // ✅ NEW: 打擊爆炸特效（擴散圓）
-    const now = performance.now();
-    for (let i = explosions.length - 1; i >= 0; i--) {
-      const e = explosions[i];
-      const t = (now - e.t0) / e.life;
-      if (t >= 1) { explosions.splice(i, 1); continue; }
-      const r = 18 + t * 70;
-      ctx.save();
-      ctx.globalAlpha = 1 - t;
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = (1 - t) * 0.6;
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = 'rgba(255,215,0,0.85)';
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, r * 0.55, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
   }
 };
 
@@ -130,6 +107,25 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let combo = 0;
   let maxCombo = 0;
   const explosions = []; // {x,y,t0,life}
+  const lasers = []; // {x1,y1,x2,y2,t0,life,kind}
+
+  // 取得按鍵在 canvas 的發射位置（抓不到就用畫面底部中間備援）
+  function getKeyOrigin(ch){
+    const kp = keyPositions[ch];
+    if (kp && Number.isFinite(kp.x) && Number.isFinite(kp.y)) return { x: kp.x, y: kp.y };
+    return { x: W * 0.5, y: H - 40 };
+  }
+
+  // 生成一條雷射（純視覺，不影響判定）
+  function spawnLaser(fromX, fromY, toX, toY, kind='normal'){
+    lasers.push({
+      x1: fromX, y1: fromY,
+      x2: toX,   y2: toY,
+      kind,
+      t0: performance.now(),
+      life: 90 // ms：越小越「瞬間」
+    });
+  }
     const GOLD_CHANCE = 0.10; // 黃金隕石機率（10%）
   const ICE_CHANCE  = 0.10; // 冰凍隕石機率（10%）
   const BOSS_CHANCE = 0.04; // Boss 隕石機率（4%）
@@ -398,6 +394,56 @@ function spawn(){
     ctx.restore();
   });
 
+
+  // ✅ NEW: 雷射瞬間線（畫在隕石上方、爆炸下方）
+  for (let i = lasers.length - 1; i >= 0; i--) {
+    const l = lasers[i];
+    const t = (now - l.t0) / l.life;
+    if (t >= 1) { lasers.splice(i, 1); continue; }
+
+    // 讓雷射前 1/3 最亮，後面快速淡出
+    const a = t < 0.33 ? 1 : Math.max(0, 1 - (t - 0.33) / 0.67);
+
+    // 不同隕石給一點點不同色（避免太花，可自行統一成白色）
+    const color =
+      (l.kind === 'ice')  ? `rgba(120,220,255,${0.85 * a})` :
+      (l.kind === 'gold') ? `rgba(255,215,0,${0.85 * a})` :
+      (l.kind === 'boss') ? `rgba(255,120,120,${0.85 * a})` :
+                            `rgba(255,255,255,${0.85 * a})`;
+
+    ctx.save();
+
+    // 外發光（粗線）
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 14;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(l.x1, l.y1);
+    ctx.lineTo(l.x2, l.y2);
+    ctx.stroke();
+
+    // 內核（細線）
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = `rgba(255,255,255,${0.95 * a})`;
+    ctx.beginPath();
+    ctx.moveTo(l.x1, l.y1);
+    ctx.lineTo(l.x2, l.y2);
+    ctx.stroke();
+
+    // 發射口閃光
+    if (t < 0.25) {
+      ctx.globalAlpha = (0.25 - t) / 0.25;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = `rgba(255,255,255,0.9)`;
+      ctx.beginPath();
+      ctx.arc(l.x1, l.y1, 18, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
   // 爆炸特效（擴散圈）
   for (let i = explosions.length - 1; i >= 0; i--) {
     const e = explosions[i];
@@ -461,6 +507,10 @@ function spawn(){
     }
     if(idx>=0){
       const m = meteors[idx];
+      // ✅ NEW: 雷射瞬間線（純視覺，不延遲判定）
+      const o = getKeyOrigin(ch);
+      spawnLaser(o.x, o.y, m.x, m.y, m.type || 'normal');
+
 
       // ✅ NEW: Boss 有血量（打到先扣血，血量歸 0 才消失）
       let removed = true;
@@ -628,12 +678,12 @@ async function endAndShowLeader(){
     await setBest();
 
     if (passed && level < LEVELS.length) level++;
-    correct = 0; wrong = 0; combo = 0; meteors.length = 0;
+    correct = 0; wrong = 0; combo = 0; meteors.length = 0; lasers.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60; setTime(); draw();
   }
 
   function restart(){
-    level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0;
+    level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0;
     timeLeft=(LEVELS[level-1]?.duration)||60; setScore(); setTime();
     meteors=[]; draw(); closeResult(); startGame();
   }
@@ -683,7 +733,7 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     try { await API.upsertStudent({ sid }); } catch (e) { alert('登入失敗：' + e.message); return; }
     setUserChip(); await setBest();
     if ($('login')) $('login').style.display='none';
-    score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; level=1;
+    score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0; level=1;
     timeLeft=(LEVELS[level-1]?.duration)||60;
     setScore(); setTime(); meteors=[]; draw();
 // ✅ 登入後自動開始
@@ -724,7 +774,7 @@ function showTeacherLock() {
   if (typeof showLock === 'function') showLock();
 }
 
-async function jsonFetch(url, opts = {}) {
+async function adminJsonFetch(url, opts = {}) {
   const res = await fetch(url, {
     ...opts,
     headers: {
@@ -747,13 +797,13 @@ async function jsonFetch(url, opts = {}) {
 
 const AdminAPI = {
   clearClass: (classPrefix, token) =>
-    jsonFetch('/api/admin/clear-class', {
+    adminJsonFetch('/api/admin/clear-class', {
       method: 'POST',
       headers: { 'x-teacher-token': token },
       body: JSON.stringify({ classPrefix, mode: 'delete' })
     }),
   clearAll: (token) =>
-    jsonFetch('/api/admin/clear-all', {
+    adminJsonFetch('/api/admin/clear-all', {
       method: 'POST',
       headers: { 'x-teacher-token': token },
       body: JSON.stringify({ mode: 'delete' })
