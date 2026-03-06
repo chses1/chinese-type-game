@@ -3,19 +3,32 @@ import express from "express";
 import cors from "cors";
 import { MongoClient } from "mongodb";
 import path from "node:path";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-// 目錄定位：本檔在 /server，靜態檔案在專案根目錄
+// 目錄定位：同時支援兩種放法
+// 1. server.js 放在專案根目錄
+// 2. server.js 放在 /server 子資料夾
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT_DIR   = path.resolve(__dirname, "..");   // ← 專案根目錄
+const ROOT_DIR   = ["index.html", "teacher.html", "main.js", "style.css"].every(name => fs.existsSync(path.join(__dirname, name)))
+  ? __dirname
+  : path.resolve(__dirname, "..");
 const SERVER_DIR = __dirname;
 
 const app = express();
 app.use(express.json());
+
+// 避免教室競賽狀態被瀏覽器或代理快取，造成老師已開啟但前端仍顯示未開啟
+app.use("/api", (_req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+  next();
+});
 
 // CORS（有需要再設）
 if (process.env.CORS_ORIGIN) {
@@ -248,6 +261,7 @@ app.post("/api/admin/classroom/open", adminAuth, async (req, res) => {
     startAt: null,
     countdownSec: 0
   });
+  console.log(`[classroom] open class=${classPrefix}`);
   res.json({ ok:true, data: { ...state } });
 });
 
@@ -266,6 +280,7 @@ app.post("/api/admin/classroom/start", adminAuth, async (req, res) => {
     startAt: Date.now() + countdownSec * 1000,
     roundId: Number(classroomState.roundId || 0) + 1
   });
+  console.log(`[classroom] start class=${classPrefix} countdown=${countdownSec}s round=${state.roundId}`);
   res.json({ ok:true, data: { ...state } });
 });
 
@@ -277,6 +292,7 @@ app.post("/api/admin/classroom/pause", adminAuth, async (_req, res) => {
     startAt: null,
     countdownSec: 0
   });
+  console.log(`[classroom] pause class=${state.classPrefix}`);
   res.json({ ok:true, data: { ...state } });
 });
 
@@ -292,6 +308,7 @@ app.post("/api/admin/classroom/restart", adminAuth, async (req, res) => {
     startAt: Date.now() + countdownSec * 1000,
     roundId: Number(classroomState.roundId || 0) + 1
   });
+  console.log(`[classroom] restart class=${state.classPrefix} countdown=${countdownSec}s round=${state.roundId}`);
   res.json({ ok:true, data: { ...state } });
 });
 
@@ -303,6 +320,7 @@ app.post("/api/admin/classroom/close", adminAuth, async (_req, res) => {
     startAt: null,
     countdownSec: 0
   });
+  console.log(`[classroom] close`);
   res.json({ ok:true, data: { ...state } });
 });
 

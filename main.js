@@ -4,6 +4,7 @@ const API_BASE = "/api";
 
 async function jsonFetch(path, options = {}) {
   const res = await fetch(path, {
+    cache: "no-store",
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options
   });
@@ -24,7 +25,7 @@ const API = {
   },
   getStudent(sid)  { return jsonFetch(`${API_BASE}/student/${sid}`); },
   getClasses()     { return jsonFetch(`${API_BASE}/classes`); },
-  classroomState() { return jsonFetch(`${API_BASE}/classroom/state`); },
+  classroomState() { return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`); },
 
   // ✅ 「刪除整筆」模式（含學號）
   adminClearClass(prefix, token){

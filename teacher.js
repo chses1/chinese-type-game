@@ -15,6 +15,7 @@ function hideLock(){ const lock=$('lock'), app=$('app'); if(lock&&app){ lock.sty
 // 共用 fetch（會把 4xx/5xx 的訊息吐出來）
 async function jsonFetch(url, opts = {}) {
   const res = await fetch(url, {
+    cache: 'no-store',
     ...opts,
     headers: { 'Content-Type':'application/json', ...(opts.headers||{}) },
   });
@@ -55,7 +56,7 @@ const API = {
     });
   },
   classroomState(){
-    return jsonFetch(`${API_BASE}/classroom/state`);
+    return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`);
   },
   classroomOpen(classPrefix, token){
     return jsonFetch(`${API_BASE}/admin/classroom/open`, {
@@ -258,11 +259,11 @@ $('btnShowAll')      && ($('btnShowAll').onclick     = loadAllRank);
 $('btnLoadClassRank')&& ($('btnLoadClassRank').onclick= loadClassRank);
 $('btnClearClass')   && ($('btnClearClass').onclick  = clearClass);
 $('btnClearAll')     && ($('btnClearAll').onclick    = clearAll);
-$('btnCcOpen')       && ($('btnCcOpen').onclick      = ccOpen);
-$('btnCcStart')      && ($('btnCcStart').onclick     = ccStart);
-$('btnCcPause')      && ($('btnCcPause').onclick     = ccPause);
-$('btnCcRestart')    && ($('btnCcRestart').onclick   = ccRestart);
-$('btnCcClose')      && ($('btnCcClose').onclick     = ccClose);
+$('btnCcOpen')       && ($('btnCcOpen').onclick      = ()=>ccOpen().catch(e=>alert('開啟班級競賽失敗：'+e.message)));
+$('btnCcStart')      && ($('btnCcStart').onclick     = ()=>ccStart().catch(e=>alert('全班開始失敗：'+e.message)));
+$('btnCcPause')      && ($('btnCcPause').onclick     = ()=>ccPause().catch(e=>alert('全班暫停失敗：'+e.message)));
+$('btnCcRestart')    && ($('btnCcRestart').onclick   = ()=>ccRestart().catch(e=>alert('全班重來失敗：'+e.message)));
+$('btnCcClose')      && ($('btnCcClose').onclick     = ()=>ccClose().catch(e=>alert('結束競賽失敗：'+e.message)));
 
 // 🔒 鎖定流程
 (function init(){
