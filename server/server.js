@@ -264,7 +264,7 @@ app.get("/api/classroom/state", async (_req, res) => {
 });
 
 // ====== 教師權限 ======
-const TEACHER_TOKEN = process.env.TEACHER_TOKEN || "1070";
+const TEACHER_TOKEN = process.env.TEACHER_TOKEN;
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const adminSessions = new Map();
 
@@ -291,18 +291,17 @@ function adminAuth(req, res, next) {
 }
 
 app.post("/api/admin/login", (req, res) => {
+  if (!TEACHER_TOKEN) {
+    return res.status(500).json({ ok: false, error: "teacher_token_not_set" });
+  }
+
   const password = String(req.body?.password || "").trim();
   if (!password || password !== TEACHER_TOKEN) {
     return res.status(401).json({ ok: false, error: "unauthorized" });
   }
+
   const sessionToken = createAdminSession();
   res.json({ ok: true, data: { sessionToken, expiresInMs: ADMIN_SESSION_TTL_MS } });
-});
-
-app.post("/api/admin/logout", (req, res) => {
-  const sessionToken = getAdminSessionToken(req);
-  if (sessionToken) adminSessions.delete(sessionToken);
-  res.json({ ok: true });
 });
 
 // 清除某班（刪除 or 歸零）
