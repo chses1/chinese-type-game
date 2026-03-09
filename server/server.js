@@ -125,7 +125,7 @@ app.post("/api/update-best", async (req, res) => {
 // 排行榜（支援班級過濾：?limit=50&classPrefix=301）
 app.get("/api/leaderboard", async (req, res) => {
   if (!requireDB(res)) return;
-  const limit = Math.min(Number(req.query.limit || 10), 100);
+  const limit = Math.min(Number(req.query.limit || 10), 500);
   const classPrefix = (req.query.classPrefix || "").trim();
   const filter = {};
   if (/^\d{3}$/.test(classPrefix)) filter.sid = new RegExp("^" + classPrefix);

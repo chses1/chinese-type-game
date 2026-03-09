@@ -90,6 +90,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   // === 等級 & 速度 ===
   let level = 1;
+  const MAX_LIVES = 3;
+  let lives = MAX_LIVES;
   const ACC_THRESHOLD = 0.8;
   const LEVELS = [{ lpm:10, duration:60 }, { lpm:15, duration:60 }, { lpm:20, duration:60 }];
   const spawnInterval = () => Math.max(320, Math.round(60000 / (LEVELS[level-1] || LEVELS.at(-1)).lpm));
@@ -179,6 +181,36 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const setUserChip=()=>$('userChip') && ($('userChip').textContent=me.sid?`${me.sid}`:'未登入');
   const setScore=()=>$('score') && ($('score').textContent=score);
   const setTime =()=>$('time') && ($('time').textContent=timeLeft);
+  const setLives=()=>{ const el=$('lives'); if(el) el.textContent = '❤️'.repeat(Math.max(0,lives)) + '🤍'.repeat(Math.max(0,MAX_LIVES-lives)); };
+
+  function resetRoundState(){
+    correct = 0;
+    wrong = 0;
+    combo = 0;
+    maxCombo = 0;
+    meteors.length = 0;
+    lasers.length = 0;
+    explosions.length = 0;
+    earthHits.length = 0;
+    timeLeft = (LEVELS[level-1]?.duration) || 60;
+    setTime();
+    draw();
+  }
+
+  function resetWholeGame({keepLogin=true} = {}){
+    gameEnded = false;
+    running = false;
+    clearInterval(timerId);
+    level = 1;
+    lives = MAX_LIVES;
+    score = 0;
+    resetRoundState();
+    setScore();
+    setLives();
+    closeResult();
+    if (!keepLogin) me = { sid:null, name:'' };
+    updatePauseButton();
+  }
 
   function updatePauseButton(){
     const btn = document.querySelector('#kbd .key.control');
@@ -857,37 +889,50 @@ async function endAndShowLeader(){
       endGame();
     } },1000); }
 
-  function showResult({correct, wrong, acc, speed, passed}){
+  function showResult({correct, wrong, acc, speed, passed, livesLeft = lives, gameOver = false}){
     if ($('resCorrect')) $('resCorrect').textContent = correct;
     if ($('resWrong'))   $('resWrong').textContent   = wrong;
     if ($('resAcc'))     $('resAcc').textContent     = Math.round(acc*100) + '%';
     if ($('resSpeed'))   $('resSpeed').textContent   = Math.round(speed);
-    if ($('resPromo'))   $('resPromo').textContent   = passed ? '✅ 達標' : '❌ 未達標';
+
+    const promoEl = $('resPromo');
+    if (promoEl) {
+      if (gameOver) {
+        promoEl.textContent = '💀 愛心用完';
+      } else if (passed) {
+        promoEl.textContent = `✅ 達標（愛心 ${livesLeft}/${MAX_LIVES}）`;
+      } else {
+        promoEl.textContent = `❌ 未達標（剩 ${livesLeft} 顆）`;
+      }
+    }
 
     const btn = $('resultPrimaryBtn');
     if (btn) {
       const freshBtn = btn.cloneNode(true);
       btn.replaceWith(freshBtn);
-      if (passed) {
+
+      if (classroomMode) {
+        freshBtn.textContent = '等待老師下一回合';
+        freshBtn.disabled = true;
+      } else if (gameOver) {
+        freshBtn.textContent = '查看排行榜';
+        freshBtn.disabled = true;
+      } else if (passed) {
         freshBtn.textContent = '挑戰下一關';
         freshBtn.onclick = () => {
           closeResult();
-          correct = 0;
-          wrong = 0;
-          combo = 0;
-          maxCombo = 0;
-          meteors.length = 0;
-          lasers.length = 0;
-          explosions.length = 0;
           gameEnded = false;
-          timeLeft = (LEVELS[level-1]?.duration) || 60;
-          setTime();
-          draw();
+          resetRoundState();
           startGame();
         };
       } else {
-        freshBtn.textContent = '重新開始';
-        freshBtn.onclick = () => { closeResult(); restart(); };
+        freshBtn.textContent = '再挑戰本關';
+        freshBtn.onclick = () => {
+          closeResult();
+          gameEnded = false;
+          resetRoundState();
+          startGame();
+        };
       }
     }
     if ($('resultBox')) $('resultBox').style.display = 'flex';
@@ -907,23 +952,44 @@ async function endAndShowLeader(){
     const speed = correct / minutes;
     const passed = acc >= ACC_THRESHOLD;
 
-    // 先顯示結果，再立刻把「下一局需要的狀態」準備好，避免任何後續錯誤導致下一關時間仍是 0
-    showResult({ correct, wrong, acc, speed, passed });
+    if (classroomMode) {
+      showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
+      try {
+        if (me.sid) await submitBest(me.sid, score);
+        await setBest();
+      } catch (e) {
+        console.warn('endGame submit/setBest fail', e);
+      }
+      resetRoundState();
+      try {
+        classroomRoundFinished = true;
+        sendHeartbeat('finished');
+        if (typeof showClassroomOverlay === 'function') {
+          showClassroomOverlay('本回合結束', '請等待老師下一次開始', '你可以先看成績，不能自行重開。');
+        }
+      } catch (e) {
+        console.warn('classroom overlay fail', e);
+      }
+      return;
+    }
 
-    if (passed && level < LEVELS.length) level++;
+    if (passed) {
+      if (level < LEVELS.length) level++;
+      lives = Math.min(MAX_LIVES, lives + 1);
+      toast && toast(lives >= MAX_LIVES ? '🛡️ 過關成功，愛心已滿' : '💖 過關補回一顆愛心');
+      showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
+    } else {
+      lives = Math.max(0, lives - 1);
+      if (lives > 0) {
+        toast && toast(`💔 未達標，再挑戰本關（剩 ${lives} 顆）`);
+        showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
+      } else {
+        closeResult();
+      }
+    }
 
-    correct = 0;
-    wrong = 0;
-    combo = 0;
-    maxCombo = 0;
-    meteors.length = 0;
-    lasers.length = 0;
-    explosions.length = 0;
-    timeLeft = (LEVELS[level-1]?.duration) || 60;
-    setTime();
-    draw();
+    setLives();
 
-    // 下面這些屬於附加功能，就算失敗也不能影響下一關
     try {
       if (me.sid) await submitBest(me.sid, score);
       await setBest();
@@ -931,24 +997,17 @@ async function endAndShowLeader(){
       console.warn('endGame submit/setBest fail', e);
     }
 
-    try {
-      if (typeof classroomMode !== 'undefined' && classroomMode) {
-        classroomRoundFinished = true;
-        sendHeartbeat('finished');
-        if (typeof showClassroomOverlay === 'function') {
-          showClassroomOverlay('本回合結束', '請等待老師下一次開始', '你可以先看成績，不能自行重開。');
-        }
-      }
-    } catch (e) {
-      console.warn('classroom overlay fail', e);
+    if (lives <= 0) {
+      leaderAutoRestart = true;
+      await openLeader();
+      return;
     }
+
+    resetRoundState();
   }
 
   function restart(){
-    gameEnded = false; // 重置結束狀態
-    level=1; score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0;
-    timeLeft=(LEVELS[level-1]?.duration)||60; setScore(); setTime();
-    meteors=[]; draw(); closeResult();
+    resetWholeGame();
     if (classroomMode) classroomRoundStarted = true;
     startGame();
     updatePauseButton();
@@ -957,13 +1016,38 @@ async function endAndShowLeader(){
   // 排行榜（教師按鈕在遊戲頁也可用）
   async function openLeader() {
     const closeBtn = $('btnCloseLeader');
-if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始' : '關閉';
+    if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始' : '關閉';
 
     const tb = $('leaderBody'); if(!tb) return;
+    const meta = $('leaderMeta');
     try {
-      const data = await API.leaderboard(50);
-      tb.innerHTML = data.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
+      const data = await API.leaderboard(500);
+      const list = Array.isArray(data.data) ? data.data : [];
+      const myIndex = list.findIndex(r => String(r.sid) === String(me.sid || ''));
+
+      tb.innerHTML = list.map((r,i)=>{
+        const rank = i + 1;
+        const isMe = String(r.sid) === String(me.sid || '');
+        return `<tr class="${isMe ? 'me' : ''}"><td>${rank}</td><td>${r.sid}${isMe ? '（你）' : ''}</td><td>${r.best}</td></tr>`;
+      }).join('') || `<tr><td colspan="3">目前沒有排行榜資料</td></tr>`;
+
+      if (meta) {
+        if (myIndex >= 0) meta.textContent = `已反白你的名次，並自動捲到第 ${myIndex+1} 名附近`;
+        else meta.textContent = `目前共 ${list.length} 人`;
+      }
+
+      requestAnimationFrame(() => {
+        const wrap = document.querySelector('#leader .leaderTableWrap');
+        const meRow = tb.querySelector('tr.me');
+        if (wrap && meRow) {
+          const top = meRow.offsetTop - wrap.clientHeight / 2 + meRow.clientHeight / 2;
+          wrap.scrollTop = Math.max(0, top);
+        } else if (wrap) {
+          wrap.scrollTop = 0;
+        }
+      });
     } catch (e) {
+      if (meta) meta.textContent = '排行榜載入失敗';
       tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
     }
     const panel = $('leader'); if(panel){ panel.classList.add('show'); panel.removeAttribute('hidden'); }
@@ -976,7 +1060,8 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     if (leaderAutoRestart) {
       leaderAutoRestart = false;
       if (!classroomMode) {
-        restart();
+        resetWholeGame();
+        startGame();
       }
     }
   }
@@ -1001,9 +1086,7 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
     try { await API.upsertStudent({ sid }); } catch (e) { alert('登入失敗：' + e.message); return; }
     setUserChip(); await setBest();
     if ($('login')) $('login').style.display='none';
-    score=0; correct=0; wrong=0; combo=0; maxCombo=0; explosions.length=0; lasers.length=0; level=1;
-    timeLeft=(LEVELS[level-1]?.duration)||60;
-    setScore(); setTime(); meteors=[]; draw();
+    resetWholeGame();
 
     startHeartbeat();
     startClassroomPolling();
@@ -1024,7 +1107,7 @@ if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始'
   });
 
   // 初始化
-  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setBest(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
+  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); setBest(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
   window.addEventListener('beforeunload', () => { stopClassroomPolling(); stopHeartbeat(); });
 });
 

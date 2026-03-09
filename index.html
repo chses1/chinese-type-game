@@ -12,6 +12,7 @@
   <div class="chip">👨‍🎓 <span id="userChip">未登入</span></div>
   <div class="chip">分數 <b id="score">0</b></div>
   <div class="chip">時間 <b id="time">60</b>s</div>
+  <div class="chip">愛心 <b id="lives">❤️❤️❤️</b></div>
   <div class="chip" id="chipHint">提示：點擊注音鍵擊落相同符號的隕石。</div>
 </header>
 
@@ -21,11 +22,17 @@
 
 <!-- 置中彈窗版本的排行榜 -->
 <div id="leader" hidden>
-  <div>
-    <table>
-      <thead><tr><th>#</th><th>學號</th><th>最佳</th></tr></thead>
-      <tbody id="leaderBody"></tbody>
-    </table>
+  <div class="leaderCard">
+    <div class="leaderTitleRow">
+      <h2>排行榜</h2>
+      <div id="leaderMeta" class="leaderMeta">載入中…</div>
+    </div>
+    <div class="leaderTableWrap">
+      <table>
+        <thead><tr><th>#</th><th>學號</th><th>最佳</th></tr></thead>
+        <tbody id="leaderBody"></tbody>
+      </table>
+    </div>
     <div style="margin-top:12px;display:flex;gap:10px;justify-content:center">
       <button id="btnRestartGame" class="tag">重新開始</button>
       <button id="btnCloseLeader" class="tag">關閉</button>

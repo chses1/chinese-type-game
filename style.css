@@ -229,3 +229,32 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
 
 /* 鍵盤維持覆蓋最上層 */
 #kbd{ max-height: var(--kbdH); z-index:20; }
+
+
+/* ===== 愛心顯示 ===== */
+#lives{letter-spacing:2px;font-size:20px}
+
+/* ===== 排行榜卷軸版 ===== */
+#leader .leaderCard{
+  width:min(92vw,720px);
+  background:rgba(12,30,66,.94);
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:18px;
+  padding:16px;
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+}
+#leader .leaderTitleRow{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+#leader .leaderTitleRow h2{margin:0;color:var(--accent)}
+#leader .leaderMeta{font-size:14px;opacity:.85}
+#leader .leaderTableWrap{
+  max-height:min(58dvh,560px);
+  overflow:auto;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;
+}
+#leader table{min-width:100%;width:100%}
+#leader thead th{position:sticky;top:0;background:rgba(11,33,72,.98);z-index:1}
+#leader tbody tr.me{background:rgba(255,213,74,.22)}
+#leader tbody tr.me td{font-weight:700;color:#fff4b8}
+#leader tbody tr:nth-child(even):not(.me){background:rgba(255,255,255,.03)}
+#leader tbody tr:last-child td{border-bottom:none}
