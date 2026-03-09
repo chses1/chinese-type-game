@@ -267,10 +267,14 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
         classroomCurrentClass = '';
         classroomCountdownEnd = 0;
         classroomLastRoundId = 0;
+        classroomRoundFinished = false;
+        classroomRoundStarted = false;
         hideClassroomOverlay();
         setModeChip('模式：自由練習', false);
         updatePauseButton();
-        if (me.sid && (!wasClassroomMode || !running) && !gameEnded) {
+        // 只有「從班級競賽切回自由練習」時才自動恢復，
+        // 平常自由練習中的手動暫停不可被輪詢自動重新開始。
+        if (me.sid && wasClassroomMode && !gameEnded) {
           enterFreePracticeMode();
         }
         return;
@@ -866,13 +870,10 @@ meteors.forEach(m => {
   }
 // ✅ 結束：顯示排行榜後「自動重新開始」
 // 做法：先停下遊戲 → 送出最佳分數 → 打開排行榜 → 當排行榜關閉時重開
-let leaderAutoRestart = false;
-
 async function endAndShowLeader(){
   if (!me.sid) { toast && toast('請先登入'); return; }
   running = false;
   clearInterval(timerId);
-  leaderAutoRestart = true;
 
   // 結束時也送出 best（避免學生按結束就沒記到）
   try { await submitBest(me.sid, score); } catch {}
@@ -998,7 +999,6 @@ async function endAndShowLeader(){
     }
 
     if (lives <= 0) {
-      leaderAutoRestart = true;
       await openLeader();
       return;
     }
@@ -1016,7 +1016,7 @@ async function endAndShowLeader(){
   // 排行榜（教師按鈕在遊戲頁也可用）
   async function openLeader() {
     const closeBtn = $('btnCloseLeader');
-    if (closeBtn) closeBtn.textContent = leaderAutoRestart ? '關閉並重新開始' : '關閉';
+    if (closeBtn) closeBtn.textContent = '結束';
 
     const tb = $('leaderBody'); if(!tb) return;
     const meta = $('leaderMeta');
@@ -1056,14 +1056,26 @@ async function endAndShowLeader(){
     const p=$('leader'); 
     if(p){ p.classList.remove('show'); 
       p.setAttribute('hidden',''); 
-    } 
-    if (leaderAutoRestart) {
-      leaderAutoRestart = false;
-      if (!classroomMode) {
-        resetWholeGame();
-        startGame();
-      }
     }
+  }
+
+  function logoutToInitialScreen(){
+    closeLeader();
+    closeResult();
+    stopClassroomPolling();
+    stopHeartbeat();
+    classroomMode = false;
+    classroomCurrentClass = '';
+    classroomCountdownEnd = 0;
+    classroomLastRoundId = 0;
+    classroomRoundFinished = false;
+    classroomRoundStarted = false;
+    hideClassroomOverlay();
+    setModeChip('模式：自由練習', false);
+    resetWholeGame({ keepLogin:false });
+    setUserChip();
+    if ($('sid')) $('sid').value = '';
+    if ($('login')) $('login').style.display = 'flex';
   }
 
   async function loadClasses(){ try{ const resp=await API.getClasses(); const box=$('classList'); if(!box) return; box.innerHTML=""; resp.data.forEach(c=>{ const btn=document.createElement('button'); btn.className='tag'; btn.textContent=`${c.class}（${c.count}人，Top ${c.top}，Avg ${c.avg}）`; btn.onclick=()=>{ const cp=$('classPrefix'); if(cp){ cp.value=c.class; loadClassRank(); } }; box.appendChild(btn); }); }catch(e){ toast && toast('載入班級清單失敗'); } }
@@ -1076,7 +1088,7 @@ async function endAndShowLeader(){
   $('btnStart')        && ($('btnStart').onclick=toggleRun);
   $('btnShowLeader')   && ($('btnShowLeader').onclick=openLeader);
   $('btnRestart')      && ($('btnRestart').onclick=()=>{ closeLeader(); closeResult(); restart(); });
-  $('btnCloseLeader')  && ($('btnCloseLeader').onclick=closeLeader);
+  $('btnCloseLeader')  && ($('btnCloseLeader').onclick=logoutToInitialScreen);
   $('btnRestartGame')  && ($('btnRestartGame').onclick=()=>{ closeLeader(); restart(); });
 
   $('go') && ($('go').onclick = async () => {
