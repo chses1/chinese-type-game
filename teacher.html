@@ -29,7 +29,6 @@
     <div class="container" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <h1 style="flex:1">教師後台</h1>
       <a href="/" class="tag">⬅️ 回到遊戲</a>
-      <button id="btnRelock" class="ghost">🔒 重新輸入教師密碼</button>
     </div>
   </header>
 
@@ -42,7 +41,7 @@
         <button id="lockEnter" class="primary">解鎖進入</button>
         <a href="/" class="ghost">返回首頁</a>
       </div>
-      <div class="muted" style="margin-top:8px">密碼僅保存在本機 <code>localStorage</code> 以作為 API 權杖。</div>
+      <div class="muted" style="margin-top:8px">密碼只在送出解鎖當下用來向伺服器換取暫時的管理權杖，不會直接保存在前端。</div>
     </div>
   </div>
 

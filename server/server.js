@@ -6,6 +6,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
+import crypto from "node:crypto";
 
 dotenv.config();
 
@@ -264,11 +265,45 @@ app.get("/api/classroom/state", async (_req, res) => {
 
 // ====== 教師權限 ======
 const TEACHER_TOKEN = process.env.TEACHER_TOKEN || "1070";
+const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const adminSessions = new Map();
+
+function createAdminSession() {
+  const sessionToken = crypto.randomBytes(32).toString("hex");
+  adminSessions.set(sessionToken, { expiresAt: Date.now() + ADMIN_SESSION_TTL_MS });
+  return sessionToken;
+}
+
+function getAdminSessionToken(req) {
+  return req.header("x-admin-session") || req.query.session || "";
+}
+
 function adminAuth(req, res, next) {
-  const token = req.header("x-teacher-token") || req.query.token;
-  if (token !== TEACHER_TOKEN) return res.status(401).json({ ok: false, error: "unauthorized" });
+  const sessionToken = getAdminSessionToken(req);
+  const session = adminSessions.get(sessionToken);
+  if (!session) return res.status(401).json({ ok: false, error: "unauthorized" });
+  if (session.expiresAt <= Date.now()) {
+    adminSessions.delete(sessionToken);
+    return res.status(401).json({ ok: false, error: "session_expired" });
+  }
+  session.expiresAt = Date.now() + ADMIN_SESSION_TTL_MS;
   next();
 }
+
+app.post("/api/admin/login", (req, res) => {
+  const password = String(req.body?.password || "").trim();
+  if (!password || password !== TEACHER_TOKEN) {
+    return res.status(401).json({ ok: false, error: "unauthorized" });
+  }
+  const sessionToken = createAdminSession();
+  res.json({ ok: true, data: { sessionToken, expiresInMs: ADMIN_SESSION_TTL_MS } });
+});
+
+app.post("/api/admin/logout", (req, res) => {
+  const sessionToken = getAdminSessionToken(req);
+  if (sessionToken) adminSessions.delete(sessionToken);
+  res.json({ ok: true });
+});
 
 // 清除某班（刪除 or 歸零）
 app.post("/api/admin/clear-class", adminAuth, async (req, res) => {

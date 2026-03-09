@@ -5,9 +5,9 @@ const $ = id => document.getElementById(id);
 const toast = msg => { const t=$('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
 
 // ✅ 統一 localStorage key（全檔一致用同一把）
-const TOKEN_KEY = 'teacher-token';
+const TOKEN_KEY = 'teacher-session-token';
 function getToken(){ return localStorage.getItem(TOKEN_KEY) || ''; }
-function setToken(v){ localStorage.setItem(TOKEN_KEY, v || ''); }
+function setToken(v){ if (v) localStorage.setItem(TOKEN_KEY, v); else localStorage.removeItem(TOKEN_KEY); }
 
 function showLock(){ const lock=$('lock'), app=$('app'); if(lock&&app){ lock.style.display='flex'; app.style.display='none'; } }
 function hideLock(){ const lock=$('lock'), app=$('app'); if(lock&&app){ lock.style.display='none'; app.style.display=''; } }
@@ -29,7 +29,22 @@ async function jsonFetch(url, opts = {}) {
 }
 
 // ✅ 補齊缺少的 API 函式
+const authHeaders = (token) => token ? { 'x-admin-session': token } : {};
+
 const API = {
+  adminLogin(password){
+    return jsonFetch(`${API_BASE}/admin/login`, {
+      method:'POST',
+      body: JSON.stringify({ password })
+    });
+  },
+  adminLogout(token){
+    return jsonFetch(`${API_BASE}/admin/logout`, {
+      method:'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({})
+    });
+  },
   // 排行榜：?limit=10&classPrefix=301（classPrefix 可省略）
   leaderboard(limit = 10, classPrefix = "") {
     const qs = new URLSearchParams({ limit });
@@ -44,14 +59,14 @@ const API = {
   adminClearClass(classPrefix, token){
     return jsonFetch(`${API_BASE}/admin/clear-class`, {
       method:'POST',
-      headers:{ 'x-teacher-token': token },
+      headers: authHeaders(token),
       body: JSON.stringify({ classPrefix, mode:'delete' })
     });
   },
   adminClearAll(token){
     return jsonFetch(`${API_BASE}/admin/clear-all`, {
       method:'POST',
-      headers:{ 'x-teacher-token': token },
+      headers: authHeaders(token),
       body: JSON.stringify({ mode:'delete' })
     });
   },
@@ -61,46 +76,46 @@ const API = {
   onlineStudents(classPrefix, token){
     const qs = new URLSearchParams();
     if (classPrefix) qs.set('classPrefix', classPrefix);
-    return jsonFetch(`${API_BASE}/admin/online-students?` + qs.toString(), { headers:{ 'x-teacher-token': token } });
+    return jsonFetch(`${API_BASE}/admin/online-students?` + qs.toString(), { headers: authHeaders(token) });
   },
   liveLeaderboard(classPrefix, limit, token){
     const qs = new URLSearchParams();
     if (classPrefix) qs.set('classPrefix', classPrefix);
     if (limit) qs.set('limit', limit);
-    return jsonFetch(`${API_BASE}/admin/live-leaderboard?` + qs.toString(), { headers:{ 'x-teacher-token': token } });
+    return jsonFetch(`${API_BASE}/admin/live-leaderboard?` + qs.toString(), { headers: authHeaders(token) });
   },
   classroomOpen(classPrefix, token){
     return jsonFetch(`${API_BASE}/admin/classroom/open`, {
       method:'POST',
-      headers:{ 'x-teacher-token': token },
+      headers: authHeaders(token),
       body: JSON.stringify({ classPrefix })
     });
   },
   classroomStart(classPrefix, countdownSec, token){
     return jsonFetch(`${API_BASE}/admin/classroom/start`, {
       method:'POST',
-      headers:{ 'x-teacher-token': token },
+      headers: authHeaders(token),
       body: JSON.stringify({ classPrefix, countdownSec })
     });
   },
   classroomPause(token){
     return jsonFetch(`${API_BASE}/admin/classroom/pause`, {
       method:'POST',
-      headers:{ 'x-teacher-token': token },
+      headers: authHeaders(token),
       body: JSON.stringify({})
     });
   },
   classroomRestart(countdownSec, token){
     return jsonFetch(`${API_BASE}/admin/classroom/restart`, {
       method:'POST',
-      headers:{ 'x-teacher-token': token },
+      headers: authHeaders(token),
       body: JSON.stringify({ countdownSec })
     });
   },
   classroomClose(token){
     return jsonFetch(`${API_BASE}/admin/classroom/close`, {
       method:'POST',
-      headers:{ 'x-teacher-token': token },
+      headers: authHeaders(token),
       body: JSON.stringify({})
     });
   },
@@ -353,12 +368,22 @@ $('btnCcClose')      && ($('btnCcClose').onclick     = ()=>ccClose().catch(e=>al
   const toggle = () => { if(btn && ipt) btn.disabled = !/^\d{3}$/.test((ipt.value||'').trim()); };
   ipt && ipt.addEventListener('input', toggle); toggle();
 
-  $('lockEnter') && ($('lockEnter').onclick = () => {
-    const v = ($('lockPass')?.value || '').trim();
-    if (!v) return alert('請輸入教師密碼');
-    setToken(v); hideLock(); loadClasses(); loadAllRank(); startClassroomPolling(); toast('已解鎖');
+  $('lockEnter') && ($('lockEnter').onclick = async () => {
+    const password = ($('lockPass')?.value || '').trim();
+    if (!password) return alert('請輸入教師密碼');
+    try {
+      const resp = await API.adminLogin(password);
+      setToken(resp?.data?.sessionToken || '');
+      if ($('lockPass')) $('lockPass').value = '';
+      hideLock();
+      loadClasses();
+      loadAllRank();
+      startClassroomPolling();
+      toast('已解鎖');
+    } catch (e) {
+      alert('教師密碼錯誤或伺服器驗證失敗');
+    }
   });
-  $('btnRelock') && ($('btnRelock').onclick = () => { setToken(''); clearInterval(classroomTimer); showLock(); if($('lockPass')) $('lockPass').value=''; });
 
   // 開啟頁面：有 token 就直接載入，沒有就先鎖住
   if ($('classPrefix') && $('ccClassPrefix')) {
