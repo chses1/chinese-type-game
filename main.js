@@ -122,6 +122,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const iceFlashes = []; // { x, y, t0, life } 冰凍隕石命中淡藍閃光
   const iceScreenGlows = []; // { t0, life } 冰凍隕石命中時整個畫面邊框泛藍光
   const effectNotices = []; // { text, t0, life, type } 畫面中央狀態提示
+  const scorePopups = []; // { x, y, text, t0, life, type } 隕石附近局部分數提示
 
   function showCenterNotice(text, life = 1600, type = 'info') {
     const now = performance.now();
@@ -129,6 +130,36 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       if (effectNotices[i].text === text) effectNotices.splice(i, 1);
     }
     effectNotices.push({ text, t0: now, life, type });
+  }
+
+  function addScorePopup(x, y, text, type = 'normal', life = 900) {
+    scorePopups.push({ x, y, text, type, t0: performance.now(), life });
+  }
+
+  function getActiveStatusBadges(now = performance.now()) {
+    const badges = [];
+    if (now < slowUntil) {
+      badges.push({
+        icon: '❄️',
+        label: `冰凍中 ${Math.max(1, Math.ceil((slowUntil - now) / 1000))} 秒`,
+        type: 'ice'
+      });
+    }
+    if (now < comboBoostUntil) {
+      badges.push({
+        icon: '⚡',
+        label: `分數加倍中 ${Math.max(1, Math.ceil((comboBoostUntil - now) / 1000))} 秒`,
+        type: 'boost'
+      });
+    }
+    if (isBossPhase()) {
+      badges.push({
+        icon: '👾',
+        label: 'Boss 波次中',
+        type: 'boss'
+      });
+    }
+    return badges;
   }
 
   // 取得按鍵在 canvas 的發射位置（抓不到就用畫面底部中間備援）
@@ -240,6 +271,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     iceFlashes.length = 0;
     iceScreenGlows.length = 0;
     effectNotices.length = 0;
+    scorePopups.length = 0;
     earthHits.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60;
     setTime();
@@ -840,7 +872,100 @@ function spawn(){
   }
   ctx.restore();
 
-  // 畫面中央狀態提示：冰凍慢動作 / Boss 波次 / 分數加倍
+  // 隕石附近局部分數提示：避免和中央狀態列重疊
+  for (let i = scorePopups.length - 1; i >= 0; i--) {
+    const p = scorePopups[i];
+    const t = (now - p.t0) / p.life;
+    if (t >= 1) {
+      scorePopups.splice(i, 1);
+      continue;
+    }
+
+    const ease = 1 - Math.pow(1 - t, 2);
+    const y = p.y - 18 - ease * 56;
+    const x = p.x;
+    const alpha = t < 0.12 ? (t / 0.12) : Math.max(0, 1 - t);
+    let fg = '255,255,255';
+    let glow = '255,255,255';
+    if (p.type === 'gold') { fg = '255,235,140'; glow = '255,215,80'; }
+    else if (p.type === 'ice') { fg = '205,245,255'; glow = '120,220,255'; }
+    else if (p.type === 'boss') { fg = '255,210,210'; glow = '255,110,110'; }
+    else if (p.type === 'boost') { fg = '255,245,180'; glow = '255,215,80'; }
+    else if (p.type === 'wrong') { fg = '255,180,180'; glow = '255,90,90'; }
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `bold ${Math.max(26, Math.min(40, W * 0.024))}px system-ui`;
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.shadowColor = `rgba(${glow},0.38)`;
+    ctx.shadowBlur = 18;
+    ctx.strokeText(p.text, x, y);
+    ctx.fillStyle = `rgba(${fg},1)`;
+    ctx.fillText(p.text, x, y);
+    ctx.restore();
+  }
+
+  // 畫面中央上方常駐狀態列：冰凍中 / 分數加倍中 / Boss 波次中
+  const statusBadges = getActiveStatusBadges(now);
+  if (statusBadges.length) {
+    const fontSize = Math.max(22, Math.min(30, W * 0.018));
+    const paddingX = 18;
+    const gap = 14;
+    const badgeH = Math.max(42, fontSize + 16);
+    ctx.save();
+    ctx.font = `bold ${fontSize}px system-ui`;
+    ctx.textBaseline = 'middle';
+
+    const widths = statusBadges.map(b => Math.ceil(ctx.measureText(`${b.icon} ${b.label}`).width) + paddingX * 2);
+    const totalW = widths.reduce((a, b) => a + b, 0) + gap * Math.max(0, statusBadges.length - 1);
+    let startX = (W - totalW) / 2;
+    const y = Math.max(92, H * 0.16);
+
+    statusBadges.forEach((b, idx) => {
+      const w = widths[idx];
+      let fill = 'rgba(20,30,50,0.78)';
+      let stroke = 'rgba(255,255,255,0.35)';
+      let glow = '255,255,255';
+      if (b.type === 'ice') { fill = 'rgba(22,75,98,0.82)'; stroke = 'rgba(135,220,255,0.92)'; glow = '120,220,255'; }
+      else if (b.type === 'boost') { fill = 'rgba(105,78,12,0.84)'; stroke = 'rgba(255,220,100,0.96)'; glow = '255,215,80'; }
+      else if (b.type === 'boss') { fill = 'rgba(110,28,35,0.84)'; stroke = 'rgba(255,125,125,0.96)'; glow = '255,110,110'; }
+
+      ctx.save();
+      ctx.shadowColor = `rgba(${glow},0.24)`;
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 3;
+      const radius = 14;
+      ctx.beginPath();
+      ctx.moveTo(startX + radius, y);
+      ctx.lineTo(startX + w - radius, y);
+      ctx.quadraticCurveTo(startX + w, y, startX + w, y + radius);
+      ctx.lineTo(startX + w, y + badgeH - radius);
+      ctx.quadraticCurveTo(startX + w, y + badgeH, startX + w - radius, y + badgeH);
+      ctx.lineTo(startX + radius, y + badgeH);
+      ctx.quadraticCurveTo(startX, y + badgeH, startX, y + badgeH - radius);
+      ctx.lineTo(startX, y + radius);
+      ctx.quadraticCurveTo(startX, y, startX + radius, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${b.icon} ${b.label}`, startX + paddingX, y + badgeH / 2 + 1);
+      ctx.restore();
+      startX += w + gap;
+    });
+
+    ctx.restore();
+  }
+
+  // 畫面中央重大事件短提示：只顯示狀態啟動瞬間
   for (let i = effectNotices.length - 1; i >= 0; i--) {
     const n = effectNotices[i];
     const t = (now - n.t0) / n.life;
@@ -850,7 +975,7 @@ function spawn(){
     }
 
     const fade = t < 0.15 ? (t / 0.15) : (t > 0.82 ? Math.max(0, 1 - (t - 0.82) / 0.18) : 1);
-    const y = H * 0.34 + (1 - fade) * 10;
+    const y = H * 0.30 + (1 - fade) * 10;
     const fontSize = Math.max(34, Math.min(52, W * 0.032));
     let fg = '255,255,255';
     let glow = '255,255,255';
@@ -942,7 +1067,6 @@ function spawn(){
         iceFlashes.push({ x: m.x, y: m.y, t0: nowTs, life: 520 });
         iceScreenGlows.push({ t0: nowTs, life: 480 });
         showCenterNotice('❄️ 冰凍慢動作', 1800, 'ice');
-        toast && toast('❄️ 全場凍結！');
       }
 
       const rt = performance.now() - m.born;
@@ -955,7 +1079,6 @@ function spawn(){
         comboEnergy = 0;
         comboBoostUntil = Math.max(comboBoostUntil, performance.now()) + COMBO_BOOST_MS;
         showCenterNotice('⚡ 分數加倍', 1800, 'boost');
-        toast && toast('⚡ 能量全滿！10 秒內分數 x2');
       }
 
       // 連擊能量滿條後，10 秒內分數 x2
@@ -966,13 +1089,17 @@ function spawn(){
       setScore();
 
       if (m.type === 'gold') {
-        toast && toast(`✨ 黃金 +${basePts * mult}${mult===2 ? '（COMBO x2）' : ''}`);
+        addScorePopup(m.x, m.y - m.size * 0.45, `✨ 黃金 +${basePts * mult}`, 'gold', 980);
       } else if (m.type === 'boss' && !removed) {
-        toast && toast(`💥 Boss 命中！剩 ${m.hp} 血`);
+        addScorePopup(m.x, m.y - m.size * 0.52, `💥 Boss -1｜剩 ${m.hp} 血`, 'boss', 1050);
       } else if (mult === 2) {
-        toast && toast(`⚡ 雙倍分數 +${basePts * mult}`);
+        addScorePopup(m.x, m.y - m.size * 0.45, `⚡ +${basePts * mult}`, 'boost', 920);
+      } else if (m.type === 'ice') {
+        addScorePopup(m.x, m.y - m.size * 0.45, `❄️ +${basePts * mult}`, 'ice', 920);
+      } else if (m.type === 'boss') {
+        addScorePopup(m.x, m.y - m.size * 0.45, `👾 +${basePts * mult}`, 'boss', 980);
       } else {
-        toast && toast(`✅ +${basePts}（${Math.round(rt)}ms）`);
+        addScorePopup(m.x, m.y - m.size * 0.45, `+${basePts * mult}`, 'normal', 860);
       }
     }else{
       // 打錯：連擊歸零
@@ -980,7 +1107,8 @@ function spawn(){
       comboEnergy = Math.max(0, comboEnergy - 22);
 
       score = Math.max(0, score-1); wrong++;
-      setScore(); toast && toast('❌ -1');
+      setScore();
+      addScorePopup(W * 0.5, H * 0.72, '❌ -1', 'wrong', 760);
     }
   }
 
