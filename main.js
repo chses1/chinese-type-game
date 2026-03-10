@@ -120,6 +120,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const lasers = []; // {x1,y1,x2,y2,t0,life,kind}
   const earthHits = []; // { t0, life } 地球被擊中閃光
   const iceFlashes = []; // { x, y, t0, life } 冰凍隕石命中淡藍閃光
+  const iceScreenGlows = []; // { t0, life } 冰凍隕石命中時整個畫面邊框泛藍光
 
   // 取得按鍵在 canvas 的發射位置（抓不到就用畫面底部中間備援）
   function getKeyOrigin(ch){
@@ -228,8 +229,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     lasers.length = 0;
     explosions.length = 0;
     iceFlashes.length = 0;
+    iceScreenGlows.length = 0;
     earthHits.length = 0;
-    iceFlashes.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60;
     setTime();
     draw();
@@ -718,28 +719,79 @@ function spawn(){
       continue;
     }
 
-    const alpha = (1 - t) * 0.42;
-    const r1 = 40 + t * 120;
-    const r2 = 20 + t * 72;
+    const alpha = (1 - t) * 0.62;
+    const r1 = 60 + t * 170;
+    const r2 = 28 + t * 96;
 
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
     const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r1);
-    g.addColorStop(0, `rgba(220,245,255,${Math.min(0.95, alpha + 0.25)})`);
-    g.addColorStop(0.45, `rgba(150,225,255,${alpha})`);
+    g.addColorStop(0, `rgba(235,250,255,${Math.min(1, alpha + 0.32)})`);
+    g.addColorStop(0.28, `rgba(190,240,255,${Math.min(0.95, alpha + 0.14)})`);
+    g.addColorStop(0.62, `rgba(110,215,255,${alpha})`);
     g.addColorStop(1, 'rgba(120,210,255,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(f.x, f.y, r1, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.lineWidth = 8;
-    ctx.strokeStyle = `rgba(180,240,255,${alpha})`;
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = `rgba(215,250,255,${Math.min(0.95, alpha + 0.12)})`;
     ctx.beginPath();
     ctx.arc(f.x, f.y, r2, 0, Math.PI * 2);
     ctx.stroke();
 
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = `rgba(120,220,255,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r1 * 0.72, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // 冰凍隕石命中時，整個畫面邊框短暫泛藍光
+  for (let i = iceScreenGlows.length - 1; i >= 0; i--) {
+    const g = iceScreenGlows[i];
+    const t = (now - g.t0) / g.life;
+    if (t >= 1) {
+      iceScreenGlows.splice(i, 1);
+      continue;
+    }
+
+    const a = (1 - t) * 0.58;
+    const edge = 28 + t * 10;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    const topGrad = ctx.createLinearGradient(0, 0, 0, edge * 3.5);
+    topGrad.addColorStop(0, `rgba(170,235,255,${Math.min(0.95, a + 0.12)})`);
+    topGrad.addColorStop(1, 'rgba(170,235,255,0)');
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, W, edge * 3.5);
+
+    const bottomGrad = ctx.createLinearGradient(0, H, 0, H - edge * 3.5);
+    bottomGrad.addColorStop(0, `rgba(170,235,255,${Math.min(0.95, a + 0.12)})`);
+    bottomGrad.addColorStop(1, 'rgba(170,235,255,0)');
+    ctx.fillStyle = bottomGrad;
+    ctx.fillRect(0, H - edge * 3.5, W, edge * 3.5);
+
+    const leftGrad = ctx.createLinearGradient(0, 0, edge * 3.5, 0);
+    leftGrad.addColorStop(0, `rgba(150,225,255,${a})`);
+    leftGrad.addColorStop(1, 'rgba(150,225,255,0)');
+    ctx.fillStyle = leftGrad;
+    ctx.fillRect(0, 0, edge * 3.5, H);
+
+    const rightGrad = ctx.createLinearGradient(W, 0, W - edge * 3.5, 0);
+    rightGrad.addColorStop(0, `rgba(150,225,255,${a})`);
+    rightGrad.addColorStop(1, 'rgba(150,225,255,0)');
+    ctx.fillStyle = rightGrad;
+    ctx.fillRect(W - edge * 3.5, 0, edge * 3.5, H);
+
+    ctx.strokeStyle = `rgba(210,248,255,${Math.min(0.95, a + 0.16)})`;
+    ctx.lineWidth = 6 + (1 - t) * 6;
+    ctx.strokeRect(8, 8, W - 16, H - 16);
     ctx.restore();
   }
 
@@ -780,7 +832,7 @@ function spawn(){
   // 連擊能量條 / 雙倍分數狀態
   ctx.save();
   const barX = 26;
-  const barY = 86;
+  const barY = Math.max(150, H - 250);
   const barW = Math.min(360, Math.max(240, W * 0.22));
   const barH = 22;
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -882,7 +934,8 @@ function spawn(){
       if (m.type === 'ice') {
         const nowTs = performance.now();
         slowUntil = nowTs + SLOW_MS;
-        iceFlashes.push({ x: m.x, y: m.y, t0: nowTs, life: 260 });
+        iceFlashes.push({ x: m.x, y: m.y, t0: nowTs, life: 360 });
+        iceScreenGlows.push({ t0: nowTs, life: 320 });
         toast && toast('❄️ 全場凍結！');
       }
 
@@ -997,6 +1050,7 @@ meteors.forEach(m => {
     lasers.length = 0;
     explosions.length = 0;
     iceFlashes.length = 0;
+    iceScreenGlows.length = 0;
 
     draw();
     updatePauseButton();
