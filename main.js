@@ -136,6 +136,12 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     scorePopups.push({ x, y, text, type, t0: performance.now(), life });
   }
 
+
+  function meteorVisualSize(m){
+    const baseSize = 300;
+    return baseSize * (m?.sizeMul || 1);
+  }
+
   function getActiveStatusBadges(now = performance.now()) {
     const badges = [];
     if (now < slowUntil) {
@@ -597,6 +603,7 @@ function spawn(){
 
     const baseSize = 300;
     const size = baseSize * (m.sizeMul || 1);
+    m.size = size;
 
     // 外圈提示：僅保留 Boss 隕石護盾圈
     if (m.type === 'boss') {
@@ -1066,6 +1073,7 @@ function spawn(){
         slowUntil = nowTs + SLOW_MS;
         iceFlashes.push({ x: m.x, y: m.y, t0: nowTs, life: 520 });
         iceScreenGlows.push({ t0: nowTs, life: 480 });
+        showCenterNotice('❄️ 冰凍慢動作', 1400, 'ice');
       }
 
       const rt = performance.now() - m.born;
@@ -1077,6 +1085,7 @@ function spawn(){
       if (comboEnergy >= 100) {
         comboEnergy = 0;
         comboBoostUntil = Math.max(comboBoostUntil, performance.now()) + COMBO_BOOST_MS;
+        showCenterNotice('⚡ 分數加倍', 1400, 'boost');
       }
 
       // 連擊能量滿條後，10 秒內分數 x2
@@ -1087,17 +1096,17 @@ function spawn(){
       setScore();
 
       if (m.type === 'gold') {
-        addScorePopup(m.x, m.y - m.size * 0.45, `✨ 黃金 +${basePts * mult}`, 'gold', 980);
+        addScorePopup(m.x, m.y - meteorVisualSize(m) * 0.45, `✨ 黃金 +${basePts * mult}`, 'gold', 980);
       } else if (m.type === 'boss' && !removed) {
-        addScorePopup(m.x, m.y - m.size * 0.52, `💥 Boss -1｜剩 ${m.hp} 血`, 'boss', 1050);
+        addScorePopup(m.x, m.y - meteorVisualSize(m) * 0.52, `💥 Boss -1｜剩 ${m.hp} 血`, 'boss', 1050);
       } else if (mult === 2) {
-        addScorePopup(m.x, m.y - m.size * 0.45, `⚡ +${basePts * mult}`, 'boost', 920);
+        addScorePopup(m.x, m.y - meteorVisualSize(m) * 0.45, `⚡ +${basePts * mult}`, 'boost', 920);
       } else if (m.type === 'ice') {
-        addScorePopup(m.x, m.y - m.size * 0.45, `❄️ +${basePts * mult}`, 'ice', 920);
+        addScorePopup(m.x, m.y - meteorVisualSize(m) * 0.45, `❄️ +${basePts * mult}`, 'ice', 920);
       } else if (m.type === 'boss') {
-        addScorePopup(m.x, m.y - m.size * 0.45, `👾 +${basePts * mult}`, 'boss', 980);
+        addScorePopup(m.x, m.y - meteorVisualSize(m) * 0.45, `👾 +${basePts * mult}`, 'boss', 980);
       } else {
-        addScorePopup(m.x, m.y - m.size * 0.45, `+${basePts * mult}`, 'normal', 860);
+        addScorePopup(m.x, m.y - meteorVisualSize(m) * 0.45, `+${basePts * mult}`, 'normal', 860);
       }
     }else{
       // 打錯：連擊歸零
@@ -1232,7 +1241,7 @@ async function endAndShowLeader(){
         toast && toast('🚨 最後 10 秒警報！');
       }
       if (timeLeft === BOSS_PHASE_SECONDS) {
-        // 已有畫面中央上方常駐狀態列顯示「Boss 波次中」，避免重複提示
+        showCenterNotice('👾 Boss 波次', 1500, 'boss');
       }
       if(timeLeft<=0 && !gameEnded){
       gameEnded = true;
