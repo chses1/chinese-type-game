@@ -155,19 +155,28 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       bossHits: 0,
       longestCombo: 0
     };
+
     activeEvent = null;
     lastEventTriggerTime = null;
-    const roundDuration = (LEVELS[level-1]?.duration) || 60;
-    eventTriggerTimes = [roundDuration - 15, roundDuration - 30, roundDuration - 45]
-      .filter(t => t > BOSS_PHASE_SECONDS && t > 0)
-      .sort((a, b) => b - a);
+
+    const roundDuration = (LEVELS[level - 1]?.duration) || 60;
+
+    // 每關最多 2 個事件，並避開最後 Boss 波次區
+    const candidates = [
+      roundDuration - 18,
+      roundDuration - 38
+    ]
+      .filter(t => t > (BOSS_PHASE_SECONDS + 2) && t > 0)
+      .slice(0, EVENT_MAX_PER_ROUND);
+
+    eventTriggerTimes = candidates.sort((a, b) => b - a);
   }
 
   function getEventPool(){
     return [
-      { id:'meteorShower', icon:'☄️', label:'流星雨', desc:'生成量上升', durationMs:6500, spawnMul:0.55 },
-      { id:'goldRush', icon:'✨', label:'黃金時刻', desc:'黃金隕石大增', durationMs:8000, goldBonus:0.26, bossPenalty:0.02 },
-      { id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場慢速，冰凍隕石增加', durationMs:7000, globalSlow:0.78, iceBonus:0.18 }
+      { id:'meteorShower', icon:'☄️', label:'流星雨', desc:'生成量上升', durationMs: EVENT_DURATION_MS, spawnMul:0.55 },
+      { id:'goldRush', icon:'✨', label:'黃金時刻', desc:'黃金隕石大增', durationMs: EVENT_DURATION_MS, goldBonus:0.26, bossPenalty:0.02 },
+      { id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場慢速，冰凍隕石增加', durationMs: EVENT_DURATION_MS, globalSlow:0.78, iceBonus:0.18 }
     ];
   }
 
@@ -192,10 +201,11 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   function triggerRoundEvent(){
     const picked = pickRoundEvent();
     if (!picked) return;
+
     const now = performance.now();
     activeEvent = { ...picked, startsAt: now, endsAt: now + picked.durationMs };
-    showCenterNotice(`${picked.icon} ${picked.label}`, 1500, 'event');
-    toast && toast(`${picked.icon} ${picked.label}：${picked.desc}`);
+
+    // 事件顯示統一交給上方常駐狀態列，避免同時跳出多個重複提示
   }
 
   function updateMissionProgress(){
@@ -214,6 +224,72 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     }
   }
 
+  function drawMissionCard() {
+    if (!activeMission) return;
+
+    const x = 22;
+    const y = 22;
+    const w = Math.min(360, Math.max(280, W * 0.25));
+    const h = 112;
+    const progress = Math.max(0, Math.min(1, activeMission.progress / activeMission.target));
+
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(8, 18, 38, 0.82)';
+    ctx.strokeStyle = activeMission.completed
+      ? 'rgba(130,255,160,0.95)'
+      : 'rgba(255,213,74,0.92)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 18);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    ctx.fillStyle = '#ffe38a';
+    ctx.font = 'bold 24px system-ui';
+    ctx.fillText('🎯 任務卡', x + 16, y + 12);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px system-ui';
+    ctx.fillText(`${activeMission.icon} ${activeMission.title}`, x + 16, y + 44);
+
+    ctx.fillStyle = 'rgba(230,240,255,0.92)';
+    ctx.font = '18px system-ui';
+    ctx.fillText(activeMission.desc, x + 16, y + 72);
+
+    const barX = x + 16;
+    const barY = y + h - 24;
+    const barW = w - 120;
+    const barH = 12;
+
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 999);
+    ctx.fill();
+
+    ctx.fillStyle = activeMission.completed
+      ? 'rgba(120,255,150,0.98)'
+      : 'rgba(255,213,74,0.98)';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW * progress, barH, 999);
+    ctx.fill();
+
+    ctx.fillStyle = activeMission.completed ? '#bfffcf' : '#ffffff';
+    ctx.font = 'bold 18px system-ui';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      `${activeMission.progress}/${activeMission.target}　+${activeMission.rewardScore}分`,
+      x + w - 16,
+      barY + barH / 2
+    );
+
+    ctx.restore();
+  }
+
 
   function meteorVisualSize(m){
     const baseSize = 300;
@@ -221,38 +297,44 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   }
 
   function getActiveStatusBadges(now = performance.now()) {
-    const badges = [];
-    if (now < slowUntil) {
-      badges.push({
-        icon: '❄️',
-        label: `冰凍中 ${Math.max(1, Math.ceil((slowUntil - now) / 1000))} 秒`,
-        type: 'ice'
-      });
-    }
-    if (now < comboBoostUntil) {
-      badges.push({
-        icon: '⚡',
-        label: `分數加倍中 ${Math.max(1, Math.ceil((comboBoostUntil - now) / 1000))} 秒`,
-        type: 'boost'
-      });
-    }
-    if (isBossPhase()) {
-      badges.push({
-        icon: '👾',
-        label: 'Boss 波次中',
-        type: 'boss'
-      });
-    }
     const eventState = getEventState(now);
+
+    // 只顯示一條主狀態，避免同時出現 3～4 個訊息
+    // 優先順序：關卡事件 > 冰凍中 > 分數加倍中 > Boss 波次中
     if (eventState) {
       const remain = Math.max(1, Math.ceil((eventState.endsAt - now) / 1000));
-      badges.push({
+      return [{
         icon: eventState.icon || '🌀',
         label: `${eventState.label} ${remain} 秒`,
         type: 'event'
-      });
+      }];
     }
-    return badges;
+
+    if (now < slowUntil) {
+      return [{
+        icon: '❄️',
+        label: `冰凍中 ${Math.max(1, Math.ceil((slowUntil - now) / 1000))} 秒`,
+        type: 'ice'
+      }];
+    }
+
+    if (now < comboBoostUntil) {
+      return [{
+        icon: '⚡',
+        label: `分數加倍中 ${Math.max(1, Math.ceil((comboBoostUntil - now) / 1000))} 秒`,
+        type: 'boost'
+      }];
+    }
+
+    if (isBossPhase()) {
+      return [{
+        icon: '👾',
+        label: 'Boss 波次中',
+        type: 'boss'
+      }];
+    }
+
+    return [];
   }
 
   // 取得按鍵在 canvas 的發射位置（抓不到就用畫面底部中間備援）
@@ -279,6 +361,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const BOSS_PHASE_SECONDS = 12;  // 最後 12 秒進入 Boss 波次
   const DANGER_SECONDS = 10;      // 最後 10 秒警報模式
   const COMBO_BOOST_MS = 10000;   // 連擊滿條後 10 秒雙倍分數
+
+  // 關卡事件設定
+  const EVENT_MAX_PER_ROUND = 2;     // 每關最多 2 個事件
+  const EVENT_DURATION_MS   = 10000; // 每次事件維持 10 秒
 
   // 冰凍效果：打到冰凍隕石 → 所有隕石慢動作幾秒
   let slowUntil = 0;          // performance.now() 的時間戳
@@ -970,6 +1056,9 @@ function spawn(){
     ctx.fillText(`x2 剩餘 ${remain} 秒`, barX + barW + 18, barY + barH - 1);
   }
   ctx.restore();
+
+  // 左上角任務卡
+  drawMissionCard();
 
   // 隕石附近局部分數提示：避免和中央狀態列重疊
   for (let i = scorePopups.length - 1; i >= 0; i--) {
