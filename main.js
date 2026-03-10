@@ -28,21 +28,6 @@ const API = {
   classroomState() { return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`); },
   studentHeartbeat(payload){ return jsonFetch(`${API_BASE}/student/heartbeat`, { method:"POST", body:JSON.stringify(payload) }); },
 
-  // ✅ 「刪除整筆」模式（含學號）
-  adminClearClass(prefix, token){
-    return jsonFetch(`${API_BASE}/admin/clear-class`, {
-      method:"POST",
-      headers:{ "x-teacher-token": token },
-      body: JSON.stringify({ classPrefix: prefix, mode: "delete" })
-    });
-  },
-  adminClearAll(token){
-    return jsonFetch(`${API_BASE}/admin/clear-all`, {
-      method:"POST",
-      headers:{ "x-teacher-token": token },
-      body: JSON.stringify({ mode: "delete" })
-    });
-  }
 };
 
 // ====== 等待 DOM 準備好再初始化（避免抓不到節點）======
@@ -124,6 +109,14 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const effectNotices = []; // { text, t0, life, type } 畫面中央狀態提示
   const scorePopups = []; // { x, y, text, t0, life, type } 隕石附近局部分數提示
 
+  // ====== NEW: 小任務 / 關卡事件 ======
+  let activeMission = null;
+  let missionRewardClaimed = false;
+  let missionStats = null;
+  let activeEvent = null;
+  let eventTriggerTimes = [];
+  let lastEventTriggerTime = null;
+
   function showCenterNotice(text, life = 1600, type = 'info') {
     const now = performance.now();
     for (let i = effectNotices.length - 1; i >= 0; i--) {
@@ -134,6 +127,91 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   function addScorePopup(x, y, text, type = 'normal', life = 900) {
     scorePopups.push({ x, y, text, type, t0: performance.now(), life });
+  }
+
+  function buildMissionPool(){
+    return [
+      { id:'goldHunter', icon:'✨', title:'黃金獵人', desc:'本關打中 3 顆黃金隕石', target:3, rewardScore:8, statKey:'goldHits' },
+      { id:'iceBreaker', icon:'❄️', title:'冰凍專家', desc:'本關打中 2 顆冰凍隕石', target:2, rewardScore:6, statKey:'iceHits' },
+      { id:'comboMaster', icon:'🔥', title:'連擊高手', desc:'本關達成 10 連擊', target:10, rewardScore:10, statKey:'longestCombo' },
+      { id:'quickShot', icon:'⚡', title:'快速反應', desc:'本關完成 6 次快速擊落', target:6, rewardScore:8, statKey:'fastHits' },
+      { id:'bossBreaker', icon:'👾', title:'Boss 剋星', desc:'本關命中 Boss 4 次', target:4, rewardScore:12, statKey:'bossHits' }
+    ];
+  }
+
+  function createMission(){
+    const pool = buildMissionPool();
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    return { ...picked, progress: 0, completed: false };
+  }
+
+  function resetMissionAndEvents(){
+    activeMission = createMission();
+    missionRewardClaimed = false;
+    missionStats = {
+      goldHits: 0,
+      iceHits: 0,
+      fastHits: 0,
+      bossHits: 0,
+      longestCombo: 0
+    };
+    activeEvent = null;
+    lastEventTriggerTime = null;
+    const roundDuration = (LEVELS[level-1]?.duration) || 60;
+    eventTriggerTimes = [roundDuration - 15, roundDuration - 30, roundDuration - 45]
+      .filter(t => t > BOSS_PHASE_SECONDS && t > 0)
+      .sort((a, b) => b - a);
+  }
+
+  function getEventPool(){
+    return [
+      { id:'meteorShower', icon:'☄️', label:'流星雨', desc:'生成量上升', durationMs:6500, spawnMul:0.55 },
+      { id:'goldRush', icon:'✨', label:'黃金時刻', desc:'黃金隕石大增', durationMs:8000, goldBonus:0.26, bossPenalty:0.02 },
+      { id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場慢速，冰凍隕石增加', durationMs:7000, globalSlow:0.78, iceBonus:0.18 }
+    ];
+  }
+
+  function pickRoundEvent(){
+    const pool = getEventPool();
+    if (!pool.length) return null;
+    if (!activeEvent) return { ...pool[Math.floor(Math.random() * pool.length)] };
+    const filtered = pool.filter(e => e.id !== activeEvent.id);
+    const source = filtered.length ? filtered : pool;
+    return { ...source[Math.floor(Math.random() * source.length)] };
+  }
+
+  function getEventState(now = performance.now()){
+    if (!activeEvent) return null;
+    if (now >= activeEvent.endsAt) {
+      activeEvent = null;
+      return null;
+    }
+    return activeEvent;
+  }
+
+  function triggerRoundEvent(){
+    const picked = pickRoundEvent();
+    if (!picked) return;
+    const now = performance.now();
+    activeEvent = { ...picked, startsAt: now, endsAt: now + picked.durationMs };
+    showCenterNotice(`${picked.icon} ${picked.label}`, 1500, 'event');
+    toast && toast(`${picked.icon} ${picked.label}：${picked.desc}`);
+  }
+
+  function updateMissionProgress(){
+    if (!activeMission || !missionStats) return;
+    const progress = Math.max(0, Number(missionStats[activeMission.statKey] || 0));
+    activeMission.progress = Math.min(activeMission.target, progress);
+    if (!activeMission.completed && progress >= activeMission.target) {
+      activeMission.completed = true;
+      if (!missionRewardClaimed) {
+        missionRewardClaimed = true;
+        score += activeMission.rewardScore;
+        setScore();
+        addScorePopup(W * 0.5, Math.max(120, H * 0.22), `🎯 任務完成 +${activeMission.rewardScore}`, 'mission', 1200);
+        showCenterNotice(`🎯 任務完成：${activeMission.title}`, 1500, 'mission');
+      }
+    }
   }
 
 
@@ -163,6 +241,15 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
         icon: '👾',
         label: 'Boss 波次中',
         type: 'boss'
+      });
+    }
+    const eventState = getEventState(now);
+    if (eventState) {
+      const remain = Math.max(1, Math.ceil((eventState.endsAt - now) / 1000));
+      badges.push({
+        icon: eventState.icon || '🌀',
+        label: `${eventState.label} ${remain} 秒`,
+        type: 'event'
       });
     }
     return badges;
@@ -280,6 +367,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     scorePopups.length = 0;
     earthHits.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60;
+    resetMissionAndEvents();
     setTime();
     draw();
   }
@@ -523,10 +611,14 @@ function spawn(){
 
   // 四種隕石機率（最後 12 秒進入 Boss 波次）
   let type = 'normal';
+  const eventState = getEventState();
   const r = Math.random();
-  const bossChance = isBossPhase() ? BOSS_PHASE_CHANCE : BOSS_CHANCE;
-  const goldChance = isBossPhase() ? Math.max(0.03, GOLD_CHANCE * 0.45) : GOLD_CHANCE;
-  const iceChance  = isBossPhase() ? Math.max(0.03, ICE_CHANCE * 0.45)  : ICE_CHANCE;
+  const bossChanceBase = isBossPhase() ? BOSS_PHASE_CHANCE : BOSS_CHANCE;
+  const goldChanceBase = isBossPhase() ? Math.max(0.03, GOLD_CHANCE * 0.45) : GOLD_CHANCE;
+  const iceChanceBase  = isBossPhase() ? Math.max(0.03, ICE_CHANCE * 0.45)  : ICE_CHANCE;
+  const bossChance = Math.max(0.01, bossChanceBase - (eventState?.bossPenalty || 0));
+  const goldChance = Math.min(0.5, goldChanceBase + (eventState?.goldBonus || 0));
+  const iceChance  = Math.min(0.45, iceChanceBase + (eventState?.iceBonus || 0));
 
   if (r < bossChance) type = 'boss';
   else if (r < bossChance + iceChance) type = 'ice';
@@ -899,6 +991,7 @@ function spawn(){
     else if (p.type === 'boss') { fg = '255,210,210'; glow = '255,110,110'; }
     else if (p.type === 'boost') { fg = '255,245,180'; glow = '255,215,80'; }
     else if (p.type === 'wrong') { fg = '255,180,180'; glow = '255,90,90'; }
+    else if (p.type === 'mission') { fg = '210,255,180'; glow = '140,255,120'; }
 
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -939,6 +1032,7 @@ function spawn(){
       if (b.type === 'ice') { fill = 'rgba(22,75,98,0.82)'; stroke = 'rgba(135,220,255,0.92)'; glow = '120,220,255'; }
       else if (b.type === 'boost') { fill = 'rgba(105,78,12,0.84)'; stroke = 'rgba(255,220,100,0.96)'; glow = '255,215,80'; }
       else if (b.type === 'boss') { fill = 'rgba(110,28,35,0.84)'; stroke = 'rgba(255,125,125,0.96)'; glow = '255,110,110'; }
+      else if (b.type === 'event') { fill = 'rgba(56,40,110,0.84)'; stroke = 'rgba(180,150,255,0.96)'; glow = '180,150,255'; }
 
       ctx.save();
       ctx.shadowColor = `rgba(${glow},0.24)`;
@@ -1043,6 +1137,14 @@ function spawn(){
       combo++;
       maxCombo = Math.max(maxCombo, combo);
       comboEnergy = Math.min(100, comboEnergy + (m.type === 'boss' ? 22 : m.type === 'gold' ? 18 : 12));
+      if (missionStats) {
+        if (m.type === 'gold') missionStats.goldHits++;
+        if (m.type === 'ice') missionStats.iceHits++;
+        if (m.type === 'boss') missionStats.bossHits++;
+        if ((performance.now() - m.born) <= 1500) missionStats.fastHits++;
+        missionStats.longestCombo = Math.max(missionStats.longestCombo || 0, combo);
+      }
+      updateMissionProgress();
 
       // ✅ 爆炸特效（在隕石位置）
       explosions.push({ x: m.x, y: m.y, t0: performance.now(), life: 260 });
@@ -1112,6 +1214,7 @@ function spawn(){
       // 打錯：連擊歸零
       combo = 0;
       comboEnergy = Math.max(0, comboEnergy - 22);
+      updateMissionProgress();
 
       score = Math.max(0, score-1); wrong++;
       setScore();
@@ -1123,14 +1226,17 @@ function spawn(){
     if(running){
       dangerMode = timeLeft <= DANGER_SECONDS;
       setDangerUI();
+      const eventState = getEventState();
+      const spawnRateMul = eventState?.spawnMul || 1;
       spawnTimer += 16;
-      if (spawnTimer > spawnInterval()) { spawn(); spawnTimer = 0; }
+      if (spawnTimer > (spawnInterval() * spawnRateMul)) { spawn(); spawnTimer = 0; }
       const f = 1 + 0.08 * (level - 1); // ✅ 等級加速，但不要太兇（0.08 比 0.1 更溫和）
 const slow = (performance.now() < slowUntil) ? SLOW_FACTOR : 1;
+const eventSlow = eventState?.globalSlow || 1;
 const dangerBoost = dangerMode ? 1.15 : 1;
 meteors.forEach(m => {
-  m.x += m.vx * 2 * f * slow * dangerBoost;
-  m.y += m.vy * 2 * f * slow * dangerBoost;
+  m.x += m.vx * 2 * f * slow * eventSlow * dangerBoost;
+  m.y += m.vy * 2 * f * slow * eventSlow * dangerBoost;
 });
       for (let i = meteors.length - 1; i >= 0; i--) {
   const m = meteors[i];
@@ -1147,6 +1253,7 @@ meteors.forEach(m => {
     wrong++;
     combo = 0; // ✅ 沒打到也算斷連擊
     comboEnergy = Math.max(0, comboEnergy - 18);
+    updateMissionProgress();
 
     // 🌍 隕石撞到地球：畫面閃爍 + 輕微震動
     earthHits.push({ t0: performance.now(), life: 220 });
@@ -1206,7 +1313,6 @@ meteors.forEach(m => {
     updatePauseButton();
     ticker();
     sendHeartbeat('playing');
-    sendHeartbeat('playing');
   }
   function toggleRun(){
     if (classroomMode) {
@@ -1240,6 +1346,10 @@ async function endAndShowLeader(){
         dangerAlertShown = true;
         toast && toast('🚨 最後 10 秒警報！');
       }
+      if (eventTriggerTimes.length && timeLeft <= eventTriggerTimes[0] && lastEventTriggerTime !== eventTriggerTimes[0]) {
+        lastEventTriggerTime = eventTriggerTimes.shift();
+        triggerRoundEvent();
+      }
       if (timeLeft === BOSS_PHASE_SECONDS) {
         showCenterNotice('👾 Boss 波次', 1500, 'boss');
       }
@@ -1256,12 +1366,17 @@ async function endAndShowLeader(){
 
     const promoEl = $('resPromo');
     if (promoEl) {
+      const missionLine = activeMission
+        ? (activeMission.completed
+            ? `｜🎯 ${activeMission.title} 已完成`
+            : `｜🎯 ${activeMission.title} ${activeMission.progress}/${activeMission.target}`)
+        : '';
       if (gameOver) {
-        promoEl.textContent = '💀 愛心用完';
+        promoEl.textContent = '💀 愛心用完' + missionLine;
       } else if (passed) {
-        promoEl.textContent = `✅ 達標（愛心 ${livesLeft}/${MAX_LIVES}）`;
+        promoEl.textContent = `✅ 達標（愛心 ${livesLeft}/${MAX_LIVES}）` + missionLine;
       } else {
-        promoEl.textContent = `❌ 未達標（剩 ${livesLeft} 顆）`;
+        promoEl.textContent = `❌ 未達標（剩 ${livesLeft} 顆）` + missionLine;
       }
     }
 
@@ -1443,9 +1558,7 @@ async function endAndShowLeader(){
   async function clearAll(){ if(!confirm('確認清除全部學生紀錄（含學號）？')) return; try{ await API.adminClearAll(teacherToken); toast && toast('已清除全部學生紀錄'); await loadAllRank(); }catch(e){ alert('清除失敗：'+e.message); } }
 
   // 綁定 UI（存在才綁）
-  $('btnStart')        && ($('btnStart').onclick=toggleRun);
-  $('btnShowLeader')   && ($('btnShowLeader').onclick=openLeader);
-  $('btnRestart')      && ($('btnRestart').onclick=()=>{ closeLeader(); closeResult(); restart(); });
+  // 舊版按鈕綁定已移除，避免和目前介面殘留結構混用
   $('btnCloseLeader')  && ($('btnCloseLeader').onclick=logoutToInitialScreen);
   $('btnRestartGame')  && ($('btnRestartGame').onclick=()=>{ closeLeader(); restart(); });
 
@@ -1480,112 +1593,3 @@ async function endAndShowLeader(){
   buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); setBest(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
   window.addEventListener('beforeunload', () => { stopClassroomPolling(); stopHeartbeat(); });
 });
-
-/* ===== Admin Clear Utilities (for game page) =====
-   作用：
-   - 與 teacher.js 相同：固定帶 Content-Type 與 x-teacher-token
-   - 401 會自動清掉 token，提醒重新輸入
-   - 400 會把後端的錯誤訊息完整 alert 出來（便於查欄位/規則）
-   用法：
-   - window.clearClassFromGame('101')   // 清 101 班（含學號）
-   - window.clearAllFromGame()          // 清全部（含學號）
-   - 若頁面上有 #btnClearClass / #btnClearAll，會自動綁定
-*/
-
-function getTeacherToken() {
-  return localStorage.getItem('teacher_token') || '';
-}
-
-function showTeacherLock() {
-  // 遊戲頁通常沒有鎖定層，這裡保留掛鉤避免報錯
-  if (typeof showLock === 'function') showLock();
-}
-
-async function adminJsonFetch(url, opts = {}) {
-  const res = await fetch(url, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(opts.headers || {})
-    }
-  });
-  if (!res.ok) {
-    let msg = '';
-    try { msg = await res.text(); } catch (e) {}
-    if (res.status === 401) {
-      localStorage.removeItem('teacher_token');
-      showTeacherLock();
-    }
-    throw new Error(`${res.status} ${res.statusText}${msg ? ' - ' + msg : ''}`);
-  }
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('application/json') ? res.json() : res.text();
-}
-
-const AdminAPI = {
-  clearClass: (classPrefix, token) =>
-    adminJsonFetch('/api/admin/clear-class', {
-      method: 'POST',
-      headers: { 'x-teacher-token': token },
-      body: JSON.stringify({ classPrefix, mode: 'delete' })
-    }),
-  clearAll: (token) =>
-    adminJsonFetch('/api/admin/clear-all', {
-      method: 'POST',
-      headers: { 'x-teacher-token': token },
-      body: JSON.stringify({ mode: 'delete' })
-    })
-};
-
-// 導出給 console 或其他模組呼叫
-window.clearClassFromGame = async function (prefix) {
-  const p = String(prefix || '').trim();
-  const token = getTeacherToken();
-  if (!token) { showTeacherLock(); alert('請先在教師後台輸入教師密碼。'); return; }
-  if (!/^\d{3}$/.test(p)) { alert('請輸入班級前三碼（三碼，允許 0 開頭）'); return; }
-  if (!confirm(`確認要清除 ${p} 班全部學生紀錄（含學號）？`)) return;
-
-  try {
-    await AdminAPI.clearClass(p, token);
-    alert(`已清除 ${p} 班紀錄`);
-    // 若遊戲頁也有排行榜刷新函式，可在此呼叫
-    if (typeof refreshLeaderboard === 'function') refreshLeaderboard();
-  } catch (e) {
-    if (String(e.message).startsWith('401')) {
-      alert('教師密碼錯誤或已過期，請回教師後台重新輸入。');
-    } else {
-      alert('清除失敗：' + e.message); // 會包含 400 的詳細原因
-    }
-  }
-};
-
-window.clearAllFromGame = async function () {
-  const token = getTeacherToken();
-  if (!token) { showTeacherLock(); alert('請先在教師後台輸入教師密碼。'); return; }
-  if (!confirm('確認要「清除全部學生紀錄（含學號）」嗎？')) return;
-
-  try {
-    await AdminAPI.clearAll(token);
-    alert('已清除全部學生紀錄');
-    if (typeof refreshLeaderboard === 'function') refreshLeaderboard();
-  } catch (e) {
-    if (String(e.message).startsWith('401')) {
-      alert('教師密碼錯誤或已過期，請回教師後台重新輸入。');
-    } else {
-      alert('清除失敗：' + e.message);
-    }
-  }
-};
-
-// 如果頁面上剛好有按鈕，幫你自動綁定（沒有也不會報錯）
-(function autoBindAdminButtons(){
-  const btnC = document.getElementById('btnClearClass');
-  const btnA = document.getElementById('btnClearAll');
-  const inputP = document.getElementById('classPrefix');
-  if (btnC && inputP) {
-    btnC.addEventListener('click', () => window.clearClassFromGame(inputP.value));
-  }
-  if (btnA) {
-    btnA.addEventListener('click', () => window.clearAllFromGame());
-  }
-})();
