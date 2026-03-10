@@ -119,6 +119,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const explosions = []; // {x,y,t0,life}
   const lasers = []; // {x1,y1,x2,y2,t0,life,kind}
   const earthHits = []; // { t0, life } 地球被擊中閃光
+  const iceFlashes = []; // { x, y, t0, life } 冰凍隕石命中淡藍閃光
 
   // 取得按鍵在 canvas 的發射位置（抓不到就用畫面底部中間備援）
   function getKeyOrigin(ch){
@@ -226,7 +227,9 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     meteors.length = 0;
     lasers.length = 0;
     explosions.length = 0;
+    iceFlashes.length = 0;
     earthHits.length = 0;
+    iceFlashes.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60;
     setTime();
     draw();
@@ -706,6 +709,40 @@ function spawn(){
     ctx.restore();
   }
 
+  // 冰凍隕石命中淡藍閃光
+  for (let i = iceFlashes.length - 1; i >= 0; i--) {
+    const f = iceFlashes[i];
+    const t = (now - f.t0) / f.life;
+    if (t >= 1) {
+      iceFlashes.splice(i, 1);
+      continue;
+    }
+
+    const alpha = (1 - t) * 0.42;
+    const r1 = 40 + t * 120;
+    const r2 = 20 + t * 72;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r1);
+    g.addColorStop(0, `rgba(220,245,255,${Math.min(0.95, alpha + 0.25)})`);
+    g.addColorStop(0.45, `rgba(150,225,255,${alpha})`);
+    g.addColorStop(1, 'rgba(120,210,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r1, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = `rgba(180,240,255,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, r2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   // 冰凍提示
   if (isSlow) {
     ctx.save();
@@ -743,8 +780,8 @@ function spawn(){
   // 連擊能量條 / 雙倍分數狀態
   ctx.save();
   const barX = 26;
-  const barY = H - 98;
-  const barW = 300;
+  const barY = 86;
+  const barW = Math.min(360, Math.max(240, W * 0.22));
   const barH = 22;
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.fillRect(barX, barY, barW, barH);
@@ -770,12 +807,12 @@ function spawn(){
   if (isBossPhase()) {
     ctx.save();
     ctx.fillStyle = 'rgba(120,0,0,0.42)';
-    ctx.fillRect(18, 84, 250, 52);
+    ctx.fillRect(18, 124, 250, 52);
     ctx.fillStyle = '#ffd8d8';
     ctx.font = 'bold 28px system-ui';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('⚠️ Boss 波次', 30, 110);
+    ctx.fillText('⚠️ Boss 波次', 30, 150);
     ctx.restore();
   }
 }
@@ -843,7 +880,9 @@ function spawn(){
 
       // ✅ 修正：打中冰凍隕石時，啟動全場慢動作
       if (m.type === 'ice') {
-        slowUntil = performance.now() + SLOW_MS;
+        const nowTs = performance.now();
+        slowUntil = nowTs + SLOW_MS;
+        iceFlashes.push({ x: m.x, y: m.y, t0: nowTs, life: 260 });
         toast && toast('❄️ 全場凍結！');
       }
 
@@ -957,6 +996,7 @@ meteors.forEach(m => {
     // 清除暫存特效，避免學生利用停留畫面判讀
     lasers.length = 0;
     explosions.length = 0;
+    iceFlashes.length = 0;
 
     draw();
     updatePauseButton();
