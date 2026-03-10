@@ -112,6 +112,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   // ====== NEW: Combo / 爆炸特效 / 黃金隕石 ======
   let combo = 0;
   let maxCombo = 0;
+  let comboEnergy = 0;
+  let comboBoostUntil = 0;
+  let dangerMode = false;
+  let dangerAlertShown = false;
   const explosions = []; // {x,y,t0,life}
   const lasers = []; // {x1,y1,x2,y2,t0,life,kind}
   const earthHits = []; // { t0, life } 地球被擊中閃光
@@ -135,7 +139,11 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   }
     const GOLD_CHANCE = 0.10; // 黃金隕石機率（10%）
   const ICE_CHANCE  = 0.10; // 冰凍隕石機率（10%）
-  const BOSS_CHANCE = 0.04; // Boss 隕石機率（4%）
+  const BOSS_CHANCE = 0.04; // 平常 Boss 隕石機率（4%）
+  const BOSS_PHASE_CHANCE = 0.28; // Boss 波次時機率（28%）
+  const BOSS_PHASE_SECONDS = 12;  // 最後 12 秒進入 Boss 波次
+  const DANGER_SECONDS = 10;      // 最後 10 秒警報模式
+  const COMBO_BOOST_MS = 10000;   // 連擊滿條後 10 秒雙倍分數
 
   // 冰凍效果：打到冰凍隕石 → 所有隕石慢動作幾秒
   let slowUntil = 0;          // performance.now() 的時間戳
@@ -183,11 +191,38 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const setTime =()=>$('time') && ($('time').textContent=timeLeft);
   const setLives=()=>{ const el=$('lives'); if(el) el.textContent = '❤️'.repeat(Math.max(0,lives)) + '🤍'.repeat(Math.max(0,MAX_LIVES-lives)); };
 
+  function isBossPhase(){
+    return running && timeLeft <= BOSS_PHASE_SECONDS;
+  }
+
+  function setDangerUI(){
+    const timeEl = $('time');
+    if (!timeEl) return;
+    const chip = timeEl.closest('.chip');
+    if (!chip) return;
+
+    if (dangerMode) {
+      chip.style.background = 'rgba(160,20,20,.88)';
+      chip.style.borderColor = 'rgba(255,120,120,.95)';
+      chip.style.boxShadow = '0 0 0 2px rgba(255,80,80,.16), 0 0 18px rgba(255,80,80,.38)';
+      chip.style.transform = 'scale(1.06)';
+    } else {
+      chip.style.background = '';
+      chip.style.borderColor = '';
+      chip.style.boxShadow = '';
+      chip.style.transform = '';
+    }
+  }
+
   function resetRoundState(){
     correct = 0;
     wrong = 0;
     combo = 0;
     maxCombo = 0;
+    comboEnergy = 0;
+    comboBoostUntil = 0;
+    dangerMode = false;
+    dangerAlertShown = false;
     meteors.length = 0;
     lasers.length = 0;
     explosions.length = 0;
@@ -434,12 +469,16 @@ const keyPositions = {};
 function spawn(){
   const label = ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
 
-  // 四種隕石機率（其餘就是 normal）
+  // 四種隕石機率（最後 12 秒進入 Boss 波次）
   let type = 'normal';
   const r = Math.random();
-  if (r < BOSS_CHANCE) type = 'boss';
-  else if (r < BOSS_CHANCE + ICE_CHANCE) type = 'ice';
-  else if (r < BOSS_CHANCE + ICE_CHANCE + GOLD_CHANCE) type = 'gold';
+  const bossChance = isBossPhase() ? BOSS_PHASE_CHANCE : BOSS_CHANCE;
+  const goldChance = isBossPhase() ? Math.max(0.03, GOLD_CHANCE * 0.45) : GOLD_CHANCE;
+  const iceChance  = isBossPhase() ? Math.max(0.03, ICE_CHANCE * 0.45)  : ICE_CHANCE;
+
+  if (r < bossChance) type = 'boss';
+  else if (r < bossChance + iceChance) type = 'ice';
+  else if (r < bossChance + iceChance + goldChance) type = 'gold';
 
   // ✅ NEW: 隕石瞄準「對應注音鍵」
   const targetKey = label;
@@ -495,6 +534,15 @@ function spawn(){
 
   const now = performance.now();
   const isSlow = now < slowUntil;
+  const comboBoostActive = now < comboBoostUntil;
+
+  if (dangerMode) {
+    const pulse = 0.08 + Math.abs(Math.sin(now / 140)) * 0.10;
+    ctx.save();
+    ctx.fillStyle = `rgba(255, 60, 60, ${pulse.toFixed(3)})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
 
   meteors.forEach(m=>{
 
@@ -692,7 +740,44 @@ function spawn(){
     ctx.restore();
   }
 
-  // 已移除畫面上方的 COMBO 顯示，避免與擊中提示重複
+  // 連擊能量條 / 雙倍分數狀態
+  ctx.save();
+  const barX = 26;
+  const barY = H - 98;
+  const barW = 300;
+  const barH = 22;
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(barX, barY, barW, barH);
+  ctx.fillStyle = comboBoostActive ? 'rgba(255,215,80,0.96)' : 'rgba(80,220,255,0.96)';
+  ctx.fillRect(barX, barY, barW * Math.max(0, Math.min(1, comboEnergy / 100)), barH);
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(barX, barY, barW, barH);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 22px system-ui';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(comboBoostActive ? '⚡ 雙倍分數中' : '⚡ 連擊能量', barX, barY - 8);
+
+  if (comboBoostActive) {
+    const remain = Math.max(0, Math.ceil((comboBoostUntil - now) / 1000));
+    ctx.fillStyle = 'rgba(255,245,180,0.98)';
+    ctx.font = 'bold 20px system-ui';
+    ctx.fillText(`x2 剩餘 ${remain} 秒`, barX + barW + 18, barY + barH - 1);
+  }
+  ctx.restore();
+
+  if (isBossPhase()) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(120,0,0,0.42)';
+    ctx.fillRect(18, 84, 250, 52);
+    ctx.fillStyle = '#ffd8d8';
+    ctx.font = 'bold 28px system-ui';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚠️ Boss 波次', 30, 110);
+    ctx.restore();
+  }
 }
 
   function calcPoints(rtMs){
@@ -731,6 +816,7 @@ function spawn(){
       // ✅ 連擊（Combo）
       combo++;
       maxCombo = Math.max(maxCombo, combo);
+      comboEnergy = Math.min(100, comboEnergy + (m.type === 'boss' ? 22 : m.type === 'gold' ? 18 : 12));
 
       // ✅ 爆炸特效（在隕石位置）
       explosions.push({ x: m.x, y: m.y, t0: performance.now(), life: 260 });
@@ -761,8 +847,14 @@ function spawn(){
       // 黃金隕石固定高分
       const basePts = (m.type === 'gold') ? 5 : pts;
 
-      // Combo >= 5 進入 x2
-      const mult = (combo >= 5) ? 2 : 1;
+      if (comboEnergy >= 100) {
+        comboEnergy = 0;
+        comboBoostUntil = Math.max(comboBoostUntil, performance.now()) + COMBO_BOOST_MS;
+        toast && toast('⚡ 能量全滿！10 秒內分數 x2');
+      }
+
+      // 連擊能量滿條後，10 秒內分數 x2
+      const mult = (performance.now() < comboBoostUntil) ? 2 : 1;
 
       score += basePts * mult;
       correct++;
@@ -773,13 +865,14 @@ function spawn(){
       } else if (m.type === 'boss' && !removed) {
         toast && toast(`💥 Boss 命中！剩 ${m.hp} 血`);
       } else if (mult === 2) {
-        toast && toast(`🔥 COMBO x2 +${basePts * mult}`);
+        toast && toast(`⚡ 雙倍分數 +${basePts * mult}`);
       } else {
         toast && toast(`✅ +${basePts}（${Math.round(rt)}ms）`);
       }
     }else{
       // 打錯：連擊歸零
       combo = 0;
+      comboEnergy = Math.max(0, comboEnergy - 22);
 
       score = Math.max(0, score-1); wrong++;
       setScore(); toast && toast('❌ -1');
@@ -788,13 +881,16 @@ function spawn(){
 
   function step(){
     if(running){
+      dangerMode = timeLeft <= DANGER_SECONDS;
+      setDangerUI();
       spawnTimer += 16;
       if (spawnTimer > spawnInterval()) { spawn(); spawnTimer = 0; }
       const f = 1 + 0.08 * (level - 1); // ✅ 等級加速，但不要太兇（0.08 比 0.1 更溫和）
 const slow = (performance.now() < slowUntil) ? SLOW_FACTOR : 1;
+const dangerBoost = dangerMode ? 1.15 : 1;
 meteors.forEach(m => {
-  m.x += m.vx * 2 * f * slow;
-  m.y += m.vy * 2 * f * slow;
+  m.x += m.vx * 2 * f * slow * dangerBoost;
+  m.y += m.vy * 2 * f * slow * dangerBoost;
 });
       for (let i = meteors.length - 1; i >= 0; i--) {
   const m = meteors[i];
@@ -810,6 +906,7 @@ meteors.forEach(m => {
     score = Math.max(0, score - 1);
     wrong++;
     combo = 0; // ✅ 沒打到也算斷連擊
+    comboEnergy = Math.max(0, comboEnergy - 18);
 
     // 🌍 隕石撞到地球：畫面閃爍 + 輕微震動
     earthHits.push({ t0: performance.now(), life: 220 });
@@ -818,6 +915,10 @@ meteors.forEach(m => {
   }
 }
       draw();
+    }
+    if (!running && dangerMode) {
+      dangerMode = false;
+      setDangerUI();
     }
     requestAnimationFrame(step);
   }
@@ -842,6 +943,10 @@ meteors.forEach(m => {
     // 連擊歸零
     combo = 0;
     maxCombo = 0;
+    comboEnergy = 0;
+    comboBoostUntil = 0;
+    dangerMode = false;
+    setDangerUI();
 
     // 清除暫存特效，避免學生利用停留畫面判讀
     lasers.length = 0;
@@ -885,7 +990,17 @@ async function endAndShowLeader(){
 }
 
   let timerId=null;
-  function ticker(){ clearInterval(timerId); timerId=setInterval(()=>{ if(!running) return; timeLeft--; setTime(); if(timeLeft<=0 && !gameEnded){
+  function ticker(){ clearInterval(timerId); timerId=setInterval(()=>{ if(!running) return; timeLeft--; setTime();
+      dangerMode = timeLeft <= DANGER_SECONDS;
+      setDangerUI();
+      if (dangerMode && !dangerAlertShown) {
+        dangerAlertShown = true;
+        toast && toast('🚨 最後 10 秒警報！');
+      }
+      if (timeLeft === BOSS_PHASE_SECONDS) {
+        toast && toast('👾 Boss 波次來襲！');
+      }
+      if(timeLeft<=0 && !gameEnded){
       gameEnded = true;
       endGame();
     } },1000); }
