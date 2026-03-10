@@ -1066,7 +1066,6 @@ function spawn(){
         slowUntil = nowTs + SLOW_MS;
         iceFlashes.push({ x: m.x, y: m.y, t0: nowTs, life: 520 });
         iceScreenGlows.push({ t0: nowTs, life: 480 });
-        showCenterNotice('❄️ 冰凍慢動作', 1800, 'ice');
       }
 
       const rt = performance.now() - m.born;
@@ -1078,7 +1077,6 @@ function spawn(){
       if (comboEnergy >= 100) {
         comboEnergy = 0;
         comboBoostUntil = Math.max(comboBoostUntil, performance.now()) + COMBO_BOOST_MS;
-        showCenterNotice('⚡ 分數加倍', 1800, 'boost');
       }
 
       // 連擊能量滿條後，10 秒內分數 x2
@@ -1234,8 +1232,7 @@ async function endAndShowLeader(){
         toast && toast('🚨 最後 10 秒警報！');
       }
       if (timeLeft === BOSS_PHASE_SECONDS) {
-        showCenterNotice('👾 Boss 波次', 1800, 'boss');
-        toast && toast('👾 Boss 波次來襲！');
+        // 已有畫面中央上方常駐狀態列顯示「Boss 波次中」，避免重複提示
       }
       if(timeLeft<=0 && !gameEnded){
       gameEnded = true;
