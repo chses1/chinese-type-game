@@ -121,6 +121,15 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const earthHits = []; // { t0, life } 地球被擊中閃光
   const iceFlashes = []; // { x, y, t0, life } 冰凍隕石命中淡藍閃光
   const iceScreenGlows = []; // { t0, life } 冰凍隕石命中時整個畫面邊框泛藍光
+  const effectNotices = []; // { text, t0, life, type } 畫面中央狀態提示
+
+  function showCenterNotice(text, life = 1600, type = 'info') {
+    const now = performance.now();
+    for (let i = effectNotices.length - 1; i >= 0; i--) {
+      if (effectNotices[i].text === text) effectNotices.splice(i, 1);
+    }
+    effectNotices.push({ text, t0: now, life, type });
+  }
 
   // 取得按鍵在 canvas 的發射位置（抓不到就用畫面底部中間備援）
   function getKeyOrigin(ch){
@@ -149,7 +158,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   // 冰凍效果：打到冰凍隕石 → 所有隕石慢動作幾秒
   let slowUntil = 0;          // performance.now() 的時間戳
-  const SLOW_MS = 3200;       // 慢動作持續時間
+  const SLOW_MS = 5000;       // 慢動作持續時間（延長為 5 秒）
   const SLOW_FACTOR = 0.45;   // 速度倍率（0.45 = 變慢）
   let me={sid:null,name:''};
   let teacherToken="";
@@ -230,6 +239,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     explosions.length = 0;
     iceFlashes.length = 0;
     iceScreenGlows.length = 0;
+    effectNotices.length = 0;
     earthHits.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60;
     setTime();
@@ -556,20 +566,8 @@ function spawn(){
     const baseSize = 300;
     const size = baseSize * (m.sizeMul || 1);
 
-    // 外圈提示（幫學生辨識）
-    if (m.type === 'gold') {
-      ctx.globalAlpha = 0.95;
-      ctx.lineWidth = 10;
-      ctx.strokeStyle = 'rgba(255,215,0,0.85)';
-      ctx.beginPath(); ctx.arc(0,0,size*0.48,0,Math.PI*2); ctx.stroke();
-      ctx.globalAlpha = 1;
-    } else if (m.type === 'ice') {
-      ctx.globalAlpha = 0.9;
-      ctx.lineWidth = 10;
-      ctx.strokeStyle = 'rgba(120,220,255,0.85)';
-      ctx.beginPath(); ctx.arc(0,0,size*0.48,0,Math.PI*2); ctx.stroke();
-      ctx.globalAlpha = 1;
-    } else if (m.type === 'boss') {
+    // 外圈提示：僅保留 Boss 隕石護盾圈
+    if (m.type === 'boss') {
       ctx.globalAlpha = 0.95;
       ctx.lineWidth = 14;
       ctx.strokeStyle = 'rgba(255,120,120,0.9)';
@@ -795,20 +793,6 @@ function spawn(){
     ctx.restore();
   }
 
-  // 冰凍提示
-  if (isSlow) {
-    ctx.save();
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(18, 18, 220, 52);
-    ctx.fillStyle = '#bff6ff';
-    ctx.font = 'bold 28px system-ui';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('❄️ 冰凍慢動作！', 30, 44);
-    ctx.restore();
-  }
-
   // 地球被擊中閃爍特效
   for (let i = earthHits.length - 1; i >= 0; i--) {
     const hit = earthHits[i];
@@ -856,15 +840,36 @@ function spawn(){
   }
   ctx.restore();
 
-  if (isBossPhase()) {
+  // 畫面中央狀態提示：冰凍慢動作 / Boss 波次 / 分數加倍
+  for (let i = effectNotices.length - 1; i >= 0; i--) {
+    const n = effectNotices[i];
+    const t = (now - n.t0) / n.life;
+    if (t >= 1) {
+      effectNotices.splice(i, 1);
+      continue;
+    }
+
+    const fade = t < 0.15 ? (t / 0.15) : (t > 0.82 ? Math.max(0, 1 - (t - 0.82) / 0.18) : 1);
+    const y = H * 0.34 + (1 - fade) * 10;
+    const fontSize = Math.max(34, Math.min(52, W * 0.032));
+    let fg = '255,255,255';
+    let glow = '255,255,255';
+    if (n.type === 'ice') { fg = '200,245,255'; glow = '120,220,255'; }
+    else if (n.type === 'boss') { fg = '255,220,220'; glow = '255,110,110'; }
+    else if (n.type === 'boost') { fg = '255,245,180'; glow = '255,215,80'; }
+
     ctx.save();
-    ctx.fillStyle = 'rgba(120,0,0,0.42)';
-    ctx.fillRect(18, 124, 250, 52);
-    ctx.fillStyle = '#ffd8d8';
-    ctx.font = 'bold 28px system-ui';
-    ctx.textAlign = 'left';
+    ctx.globalAlpha = fade;
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('⚠️ Boss 波次', 30, 150);
+    ctx.font = `bold ${fontSize}px system-ui`;
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.shadowColor = `rgba(${glow},0.45)`;
+    ctx.shadowBlur = 22;
+    ctx.strokeText(n.text, W / 2, y);
+    ctx.fillStyle = `rgba(${fg},1)`;
+    ctx.fillText(n.text, W / 2, y);
     ctx.restore();
   }
 }
@@ -934,8 +939,9 @@ function spawn(){
       if (m.type === 'ice') {
         const nowTs = performance.now();
         slowUntil = nowTs + SLOW_MS;
-        iceFlashes.push({ x: m.x, y: m.y, t0: nowTs, life: 360 });
-        iceScreenGlows.push({ t0: nowTs, life: 320 });
+        iceFlashes.push({ x: m.x, y: m.y, t0: nowTs, life: 520 });
+        iceScreenGlows.push({ t0: nowTs, life: 480 });
+        showCenterNotice('❄️ 冰凍慢動作', 1800, 'ice');
         toast && toast('❄️ 全場凍結！');
       }
 
@@ -948,6 +954,7 @@ function spawn(){
       if (comboEnergy >= 100) {
         comboEnergy = 0;
         comboBoostUntil = Math.max(comboBoostUntil, performance.now()) + COMBO_BOOST_MS;
+        showCenterNotice('⚡ 分數加倍', 1800, 'boost');
         toast && toast('⚡ 能量全滿！10 秒內分數 x2');
       }
 
@@ -1051,6 +1058,7 @@ meteors.forEach(m => {
     explosions.length = 0;
     iceFlashes.length = 0;
     iceScreenGlows.length = 0;
+    effectNotices.length = 0;
 
     draw();
     updatePauseButton();
@@ -1098,6 +1106,7 @@ async function endAndShowLeader(){
         toast && toast('🚨 最後 10 秒警報！');
       }
       if (timeLeft === BOSS_PHASE_SECONDS) {
+        showCenterNotice('👾 Boss 波次', 1800, 'boss');
         toast && toast('👾 Boss 波次來襲！');
       }
       if(timeLeft<=0 && !gameEnded){
