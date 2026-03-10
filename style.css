@@ -153,19 +153,183 @@ header .chip {
 #resultCard td{ padding:8px; }
 
 /* login */
-#login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:20}
-#card{width:min(440px,94vw);background:#0c2a57;border:1px solid rgba(255,255,255,.12);padding:18px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
-label{display:block;font-size:14px;margin:4px 0 6px}
-input,button,select{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:#0b2148;color:#fff}
+#login{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:linear-gradient(180deg, rgba(2,8,24,.22), rgba(0,0,0,.52));
+  z-index:20;
+}
+
+#card.loginCard{
+  width:min(560px,94vw);
+  padding:28px 28px 24px;
+  border-radius:24px;
+  border:1px solid rgba(255,255,255,.16);
+  background:linear-gradient(180deg, rgba(11,36,78,.96), rgba(8,28,62,.94));
+  box-shadow:0 22px 60px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.08);
+  backdrop-filter:blur(10px);
+}
+
+.loginBadge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 14px;
+  border-radius:999px;
+  background:rgba(255,213,74,.14);
+  border:1px solid rgba(255,213,74,.35);
+  color:#ffe58a;
+  font-size:15px;
+  font-weight:700;
+  letter-spacing:.04em;
+  margin-bottom:14px;
+}
+
+.loginTitle{
+  margin:0;
+  font-size:clamp(30px, 4.2vw, 40px);
+  line-height:1.15;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+
+.loginSubtitle{
+  margin:12px 0 0;
+  font-size:17px;
+  line-height:1.75;
+  color:rgba(238,245,255,.88);
+}
+
+.loginTips{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+  margin:18px 0 22px;
+}
+
+.loginTipItem{
+  padding:12px 14px;
+  border-radius:14px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.08);
+  font-size:15px;
+  line-height:1.45;
+  color:rgba(238,245,255,.92);
+}
+
+.loginField{
+  margin-top:6px;
+}
+
+label,
+.loginLabel{
+  display:block;
+  font-size:15px;
+  font-weight:700;
+  margin:0 0 8px;
+  color:#eef5ff;
+}
+
+input,button,select{
+  width:100%;
+  padding:12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.18);
+  background:#0b2148;
+  color:#fff;
+}
+
+.loginInput{
+  height:58px;
+  font-size:24px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-align:center;
+  background:rgba(7,25,56,.9);
+  border:1.5px solid rgba(125,170,255,.35);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);
+}
+
+.loginInput::placeholder{
+  letter-spacing:0;
+  font-size:18px;
+  font-weight:500;
+  color:rgba(255,255,255,.38);
+}
+
+.loginInput:focus{
+  outline:none;
+  border-color:rgba(109,174,255,.88);
+  box-shadow:0 0 0 4px rgba(59,124,255,.18);
+}
+
+.loginHint{
+  margin-top:8px;
+  font-size:13px;
+  color:rgba(238,245,255,.68);
+}
+
 /* ✅ 修正：鍵盤按鍵不要吃到全域 button 的 width/padding，避免大小不一、排列不齊 */
 #kbd .key{ width:auto; padding:0; }
 
-button.primary{background:linear-gradient(180deg,#2f7cff,#1b5bd1);border:none;font-weight:700}
-button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
-.rowBtns{display:flex;gap:8px;margin-top:10px}
-.rowBtns > *{flex:1 1 0; min-width:0; width:auto}
-#teacherOpen{white-space:nowrap}
+button.primary,
+.loginMainBtn{
+  min-height:54px;
+  font-size:20px;
+  font-weight:800;
+  background:linear-gradient(180deg,#3a8bff,#1b5bd1);
+  border:none;
+  box-shadow:0 10px 24px rgba(27,91,209,.28);
+}
 
+button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
+
+.rowBtns{
+  display:flex;
+  gap:12px;
+  margin-top:14px;
+}
+
+.rowBtns > *{
+  flex:1 1 0;
+  min-width:0;
+  width:auto;
+}
+
+.loginBtns{
+  margin-top:18px;
+}
+
+#teacherOpen,
+.loginSubBtn{
+  min-height:54px;
+  white-space:nowrap;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  font-weight:700;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.16);
+}
+
+@media (max-width: 640px){
+  #login{ padding:16px; }
+  #card.loginCard{ padding:22px 18px 18px; border-radius:20px; }
+  .loginSubtitle{ font-size:15px; line-height:1.6; }
+  .loginTips{ gap:8px; margin:14px 0 18px; }
+  .loginTipItem{ font-size:14px; padding:10px 12px; }
+  .loginInput{ height:54px; font-size:22px; }
+  .rowBtns{ gap:10px; }
+  button.primary,
+  .loginMainBtn,
+  #teacherOpen,
+  .loginSubBtn{ font-size:17px; min-height:50px; }
+}
 /* ===== 置中排行榜（NEW） ===== */
 #leader{
   position:fixed;

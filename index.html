@@ -71,14 +71,17 @@
 
 <!-- Login / teacher modal-->
 <div id="login">
-  <div id="card">
-    <h2 style="margin:0 0 8px">登入遊戲</h2>
-    <p style="opacity:.85;margin:.2rem 0 .8rem">請輸入 <b>學號（5位數）</b>。</p>
-    <label>學號</label>
-    <input id="sid" placeholder="例如：30130" inputmode="numeric" maxlength="5" />
-    <div class="rowBtns">
-      <button id="go" class="primary">登入</button>
-      <a id="teacherOpen" class="tag" href="/teacher">教師後台</a>
+  <div id="card" class="loginCard">
+    <h1 class="loginTitle">地球保衛戰</h1>
+    <p class="loginSubtitle">開始遊戲後，點擊下方注音鍵，擊落相同符號的隕石。</p>
+    <div class="loginField">
+      <label for="sid" class="loginLabel">登入請輸入學號 5 碼數字</label>
+      <input id="sid" class="loginInput" placeholder="例如：30130" inputmode="numeric" maxlength="5" />
+      </div>
+
+    <div class="rowBtns loginBtns">
+      <button id="go" class="primary loginMainBtn">開始登入</button>
+      <a id="teacherOpen" class="tag loginSubBtn" href="/teacher">教師後台</a>
     </div>
   </div>
 </div>
