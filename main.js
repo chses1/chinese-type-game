@@ -841,6 +841,12 @@ function spawn(){
         setTimeout(() => { canvas.style.transform = ''; }, 60);
       }
 
+      // ✅ 修正：打中冰凍隕石時，啟動全場慢動作
+      if (m.type === 'ice') {
+        slowUntil = performance.now() + SLOW_MS;
+        toast && toast('❄️ 全場凍結！');
+      }
+
       const rt = performance.now() - m.born;
       const pts = calcPoints(rt);
 
