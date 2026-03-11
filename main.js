@@ -110,9 +110,9 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const scorePopups = []; // { x, y, text, t0, life, type } 隕石附近局部分數提示
 
   // ====== NEW: 小任務 / 關卡事件 ======
-  let activeMission = null;
-  let missionRewardClaimed = false;
+  let activeMissions = [];
   let missionStats = null;
+  let missionSnapshot = [];
   let activeEvent = null;
   let eventTriggerTimes = [];
   let lastEventTriggerTime = null;
@@ -131,23 +131,39 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   function buildMissionPool(){
     return [
-      { id:'goldHunter', icon:'✨', title:'黃金獵人', desc:'本關打中 3 顆黃金隕石', target:3, rewardScore:8, statKey:'goldHits' },
-      { id:'iceBreaker', icon:'❄️', title:'冰凍專家', desc:'本關打中 2 顆冰凍隕石', target:2, rewardScore:6, statKey:'iceHits' },
-      { id:'comboMaster', icon:'🔥', title:'連擊高手', desc:'本關達成 10 連擊', target:10, rewardScore:10, statKey:'longestCombo' },
-      { id:'quickShot', icon:'⚡', title:'快速反應', desc:'本關完成 6 次快速擊落', target:6, rewardScore:8, statKey:'fastHits' },
-      { id:'bossBreaker', icon:'👾', title:'Boss 剋星', desc:'本關命中 Boss 4 次', target:4, rewardScore:12, statKey:'bossHits' }
+      { id:'goldHunter', icon:'✨', title:'黃金獵人', desc:'累積打中 3 顆黃金隕石', target:3, rewardScore:8, statKey:'goldHits' },
+      { id:'iceBreaker', icon:'❄️', title:'冰凍專家', desc:'累積打中 2 顆冰凍隕石', target:2, rewardScore:6, statKey:'iceHits' },
+      { id:'comboMaster', icon:'🔥', title:'連擊高手', desc:'累積達成 10 連擊', target:10, rewardScore:10, statKey:'longestCombo' },
+      { id:'quickShot', icon:'⚡', title:'快速反應', desc:'累積完成 5 次快速擊落', target:5, rewardScore:8, statKey:'fastHits' },
+      { id:'bossBreaker', icon:'👾', title:'Boss 剋星', desc:'累積命中 Boss 4 次', target:4, rewardScore:12, statKey:'bossHits' }
     ];
   }
 
-  function createMission(){
-    const pool = buildMissionPool();
-    const picked = pool[Math.floor(Math.random() * pool.length)];
-    return { ...picked, progress: 0, completed: false };
+  function cloneMission(mission){
+    return mission ? { ...mission } : null;
   }
 
-  function resetMissionAndEvents(){
-    activeMission = createMission();
-    missionRewardClaimed = false;
+  function createMission(excludedIds = []){
+    const pool = buildMissionPool().filter(m => !excludedIds.includes(m.id));
+    const source = pool.length ? pool : buildMissionPool();
+    const picked = source[Math.floor(Math.random() * source.length)];
+    return { ...picked, progress: 0, completed: false, rewardClaimed: false };
+  }
+
+  function prepareMissionsForRound({ keepExisting = true } = {}){
+    const carry = keepExisting
+      ? activeMissions
+          .filter(m => !m.completed)
+          .map(m => ({ ...m, completed: false, rewardClaimed: false }))
+      : [];
+
+    const freshMission = createMission(carry.map(m => m.id));
+    activeMissions = [...carry, freshMission];
+    missionSnapshot = activeMissions.map(cloneMission);
+  }
+
+  function resetMissionAndEvents({ keepExisting = true } = {}){
+    prepareMissionsForRound({ keepExisting });
     missionStats = {
       goldHits: 0,
       iceHits: 0,
@@ -170,6 +186,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       .slice(0, EVENT_MAX_PER_ROUND);
 
     eventTriggerTimes = candidates.sort((a, b) => b - a);
+  }
+
+  function snapshotCurrentMissions(){
+    missionSnapshot = activeMissions.map(cloneMission);
   }
 
   function getEventPool(){
@@ -209,85 +229,110 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   }
 
   function updateMissionProgress(){
-    if (!activeMission || !missionStats) return;
-    const progress = Math.max(0, Number(missionStats[activeMission.statKey] || 0));
-    activeMission.progress = Math.min(activeMission.target, progress);
-    if (!activeMission.completed && progress >= activeMission.target) {
-      activeMission.completed = true;
-      if (!missionRewardClaimed) {
-        missionRewardClaimed = true;
-        score += activeMission.rewardScore;
-        setScore();
-        addScorePopup(W * 0.5, Math.max(120, H * 0.22), `🎯 任務完成 +${activeMission.rewardScore}`, 'mission', 1200);
-        showCenterNotice(`🎯 任務完成：${activeMission.title}`, 1500, 'mission');
+    if (!activeMissions.length || !missionStats) return;
+
+    activeMissions.forEach((mission, index) => {
+      const progress = Math.max(0, Number(missionStats[mission.statKey] || 0));
+      mission.progress = Math.min(mission.target, progress);
+      if (!mission.completed && progress >= mission.target) {
+        mission.completed = true;
+        if (!mission.rewardClaimed) {
+          mission.rewardClaimed = true;
+          score += mission.rewardScore;
+          setScore();
+          addScorePopup(
+            W * 0.5,
+            Math.max(120, H * 0.22) + index * 34,
+            `🎯 ${mission.title} +${mission.rewardScore}`,
+            'mission',
+            1200
+          );
+          showCenterNotice(`🎯 任務完成：${mission.title}`, 1500, 'mission');
+        }
       }
-    }
+    });
+
+    snapshotCurrentMissions();
+  }
+
+  function getHeaderSafeTop(){
+    const header = document.querySelector('header');
+    if (!header) return 20;
+    const headerRect = header.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const safePx = Math.max(18, headerRect.bottom - canvasRect.top + 10);
+    return safePx * (canvas.height / Math.max(1, canvasRect.height));
   }
 
   function drawMissionCard() {
-    if (!activeMission) return;
+    if (!activeMissions.length) return;
 
     const x = 22;
-    const y = 22;
-    const w = Math.min(360, Math.max(280, W * 0.25));
+    const y0 = getHeaderSafeTop();
+    const w = Math.min(390, Math.max(300, W * 0.27));
     const h = 112;
-    const progress = Math.max(0, Math.min(1, activeMission.progress / activeMission.target));
+    const gapY = 14;
 
-    ctx.save();
+    activeMissions.forEach((mission, index) => {
+      const y = y0 + index * (h + gapY);
+      const progress = Math.max(0, Math.min(1, mission.progress / mission.target));
 
-    ctx.fillStyle = 'rgba(8, 18, 38, 0.82)';
-    ctx.strokeStyle = activeMission.completed
-      ? 'rgba(130,255,160,0.95)'
-      : 'rgba(255,213,74,0.92)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 18);
-    ctx.fill();
-    ctx.stroke();
+      ctx.save();
 
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(8, 18, 38, 0.82)';
+      ctx.strokeStyle = mission.completed
+        ? 'rgba(130,255,160,0.95)'
+        : (index === activeMissions.length - 1 ? 'rgba(255,213,74,0.92)' : 'rgba(150,190,255,0.82)');
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 18);
+      ctx.fill();
+      ctx.stroke();
 
-    ctx.fillStyle = '#ffe38a';
-    ctx.font = 'bold 24px system-ui';
-    ctx.fillText('🎯 任務卡', x + 16, y + 12);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px system-ui';
-    ctx.fillText(`${activeMission.icon} ${activeMission.title}`, x + 16, y + 44);
+      ctx.fillStyle = '#ffe38a';
+      ctx.font = 'bold 24px system-ui';
+      ctx.fillText(index === 0 ? '🎯 任務卡' : '📌 未完成任務', x + 16, y + 12);
 
-    ctx.fillStyle = 'rgba(230,240,255,0.92)';
-    ctx.font = '18px system-ui';
-    ctx.fillText(activeMission.desc, x + 16, y + 72);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 22px system-ui';
+      ctx.fillText(`${mission.icon} ${mission.title}`, x + 16, y + 44);
 
-    const barX = x + 16;
-    const barY = y + h - 24;
-    const barW = w - 120;
-    const barH = 12;
+      ctx.fillStyle = 'rgba(230,240,255,0.92)';
+      ctx.font = '18px system-ui';
+      ctx.fillText(mission.desc, x + 16, y + 72);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barW, barH, 999);
-    ctx.fill();
+      const barX = x + 16;
+      const barY = y + h - 24;
+      const barW = w - 120;
+      const barH = 12;
 
-    ctx.fillStyle = activeMission.completed
-      ? 'rgba(120,255,150,0.98)'
-      : 'rgba(255,213,74,0.98)';
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barW * progress, barH, 999);
-    ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW, barH, 999);
+      ctx.fill();
 
-    ctx.fillStyle = activeMission.completed ? '#bfffcf' : '#ffffff';
-    ctx.font = 'bold 18px system-ui';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(
-      `${activeMission.progress}/${activeMission.target}　+${activeMission.rewardScore}分`,
-      x + w - 16,
-      barY + barH / 2
-    );
+      ctx.fillStyle = mission.completed
+        ? 'rgba(120,255,150,0.98)'
+        : 'rgba(255,213,74,0.98)';
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, Math.max(8, barW * progress), barH, 999);
+      ctx.fill();
 
-    ctx.restore();
+      ctx.fillStyle = mission.completed ? '#bfffcf' : '#ffffff';
+      ctx.font = 'bold 18px system-ui';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(
+        `${mission.progress}/${mission.target}　+${mission.rewardScore}分`,
+        x + w - 16,
+        barY + barH / 2
+      );
+
+      ctx.restore();
+    });
   }
 
 
@@ -435,7 +480,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     }
   }
 
-  function resetRoundState(){
+  function resetRoundState({ keepExisting = true } = {}){
     correct = 0;
     wrong = 0;
     combo = 0;
@@ -453,7 +498,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     scorePopups.length = 0;
     earthHits.length = 0;
     timeLeft = (LEVELS[level-1]?.duration) || 60;
-    resetMissionAndEvents();
+    resetMissionAndEvents({ keepExisting });
     setTime();
     draw();
   }
@@ -465,7 +510,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     level = 1;
     lives = MAX_LIVES;
     score = 0;
-    resetRoundState();
+    resetRoundState({ keepExisting:false });
     setScore();
     setLives();
     closeResult();
@@ -1230,7 +1275,7 @@ function spawn(){
         if (m.type === 'gold') missionStats.goldHits++;
         if (m.type === 'ice') missionStats.iceHits++;
         if (m.type === 'boss') missionStats.bossHits++;
-        if ((performance.now() - m.born) <= 1500) missionStats.fastHits++;
+        if ((performance.now() - m.born) <= 2200) missionStats.fastHits++;
         missionStats.longestCombo = Math.max(missionStats.longestCombo || 0, combo);
       }
       updateMissionProgress();
@@ -1455,10 +1500,9 @@ async function endAndShowLeader(){
 
     const promoEl = $('resPromo');
     if (promoEl) {
-      const missionLine = activeMission
-        ? (activeMission.completed
-            ? `｜🎯 ${activeMission.title} 已完成`
-            : `｜🎯 ${activeMission.title} ${activeMission.progress}/${activeMission.target}`)
+      const missionsForResult = missionSnapshot.length ? missionSnapshot : activeMissions;
+      const missionLine = missionsForResult.length
+        ? '｜' + missionsForResult.map(m => `🎯 ${m.title} ${m.completed ? '已完成' : `${m.progress}/${m.target}`}`).join('｜')
         : '';
       if (gameOver) {
         promoEl.textContent = '💀 愛心用完' + missionLine;
@@ -1485,7 +1529,7 @@ async function endAndShowLeader(){
         freshBtn.onclick = () => {
           closeResult();
           gameEnded = false;
-          resetRoundState();
+          resetRoundState({ keepExisting:true });
           startGame();
         };
       } else {
@@ -1493,7 +1537,7 @@ async function endAndShowLeader(){
         freshBtn.onclick = () => {
           closeResult();
           gameEnded = false;
-          resetRoundState();
+          resetRoundState({ keepExisting:true });
           startGame();
         };
       }
@@ -1515,6 +1559,8 @@ async function endAndShowLeader(){
     const speed = correct / minutes;
     const passed = acc >= ACC_THRESHOLD;
 
+    snapshotCurrentMissions();
+
     if (classroomMode) {
       showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
       try {
@@ -1523,7 +1569,6 @@ async function endAndShowLeader(){
       } catch (e) {
         console.warn('endGame submit/setBest fail', e);
       }
-      resetRoundState();
       try {
         classroomRoundFinished = true;
         sendHeartbeat('finished');
@@ -1565,7 +1610,6 @@ async function endAndShowLeader(){
       return;
     }
 
-    resetRoundState();
   }
 
   function restart(){
