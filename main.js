@@ -228,6 +228,19 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     // 事件顯示統一交給上方常駐狀態列，避免同時跳出多個重複提示
   }
 
+  function pruneFinishedMissions(now = performance.now()){
+    const before = activeMissions.length;
+    activeMissions = activeMissions.filter(m => !m.completed || !m.completedAt || (now - m.completedAt) < 1000);
+    if (before !== activeMissions.length) {
+      snapshotCurrentMissions();
+    }
+  }
+
+  function getMissionDisplayList(now = performance.now()){
+    pruneFinishedMissions(now);
+    return activeMissions.filter(m => !m.completed || !m.completedAt || (now - m.completedAt) < 1000);
+  }
+
   function updateMissionProgress(){
     if (!activeMissions.length || !missionStats) return;
 
@@ -236,6 +249,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       mission.progress = Math.min(mission.target, progress);
       if (!mission.completed && progress >= mission.target) {
         mission.completed = true;
+        mission.completedAt = performance.now();
         if (!mission.rewardClaimed) {
           mission.rewardClaimed = true;
           score += mission.rewardScore;
@@ -255,37 +269,40 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     snapshotCurrentMissions();
   }
 
-  function getHeaderSafeTop(){
-    const header = document.querySelector('header');
-    if (!header) return 20;
-    const headerRect = header.getBoundingClientRect();
-    const canvasRect = canvas.getBoundingClientRect();
-    const safePx = Math.max(18, headerRect.bottom - canvasRect.top + 10);
-    return safePx * (canvas.height / Math.max(1, canvasRect.height));
-  }
-
   function drawMissionCard() {
-    if (!activeMissions.length) return;
+    const now = performance.now();
+    const visibleMissions = getMissionDisplayList(now);
+    if (!visibleMissions.length) return;
 
-    const x = 22;
-    const y0 = getHeaderSafeTop();
-    const w = Math.min(390, Math.max(300, W * 0.27));
-    const h = 112;
-    const gapY = 14;
+    const comboBarX = 26;
+    const comboBarY = Math.max(150, H - 250);
+    const comboBarW = Math.min(360, Math.max(240, W * 0.22));
+    const cardGap = 12;
+    const cardX = comboBarX + comboBarW + 26;
+    const cardY = comboBarY - 8;
+    const cardW = Math.min(340, Math.max(250, W * 0.24));
+    const cardH = 84;
+    const totalH = visibleMissions.length * cardH + Math.max(0, visibleMissions.length - 1) * cardGap;
+    let startY = cardY - totalH + 30;
 
-    activeMissions.forEach((mission, index) => {
-      const y = y0 + index * (h + gapY);
+    if (startY < 90) startY = 90;
+
+    visibleMissions.forEach((mission, index) => {
+      const y = startY + index * (cardH + cardGap);
       const progress = Math.max(0, Math.min(1, mission.progress / mission.target));
+      const justCompleted = mission.completed && mission.completedAt && (now - mission.completedAt) < 1000;
+      const fade = justCompleted ? Math.max(0, 1 - ((now - mission.completedAt) / 1000)) : 1;
 
       ctx.save();
+      ctx.globalAlpha = fade;
 
-      ctx.fillStyle = 'rgba(8, 18, 38, 0.82)';
-      ctx.strokeStyle = mission.completed
-        ? 'rgba(130,255,160,0.95)'
-        : (index === activeMissions.length - 1 ? 'rgba(255,213,74,0.92)' : 'rgba(150,190,255,0.82)');
+      ctx.fillStyle = 'rgba(8, 18, 38, 0.84)';
+      ctx.strokeStyle = justCompleted
+        ? 'rgba(130,255,160,0.98)'
+        : 'rgba(255,213,74,0.92)';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.roundRect(x, y, w, h, 18);
+      ctx.roundRect(cardX, y, cardW, cardH, 18);
       ctx.fill();
       ctx.stroke();
 
@@ -293,41 +310,41 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       ctx.textBaseline = 'top';
 
       ctx.fillStyle = '#ffe38a';
-      ctx.font = 'bold 24px system-ui';
-      ctx.fillText(index === 0 ? '🎯 任務卡' : '📌 未完成任務', x + 16, y + 12);
+      ctx.font = 'bold 18px system-ui';
+      ctx.fillText(justCompleted ? '✅ 任務完成' : '🎯 目前任務', cardX + 14, y + 10);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 22px system-ui';
-      ctx.fillText(`${mission.icon} ${mission.title}`, x + 16, y + 44);
+      ctx.fillText(`${mission.icon} ${mission.title}`, cardX + 14, y + 34);
 
-      ctx.fillStyle = 'rgba(230,240,255,0.92)';
-      ctx.font = '18px system-ui';
-      ctx.fillText(mission.desc, x + 16, y + 72);
-
-      const barX = x + 16;
-      const barY = y + h - 24;
-      const barW = w - 120;
-      const barH = 12;
+      const barX = cardX + 14;
+      const barY = y + cardH - 20;
+      const barW = cardW - 110;
+      const barH = 11;
 
       ctx.fillStyle = 'rgba(255,255,255,0.16)';
       ctx.beginPath();
       ctx.roundRect(barX, barY, barW, barH, 999);
       ctx.fill();
 
-      ctx.fillStyle = mission.completed
+      ctx.fillStyle = justCompleted
         ? 'rgba(120,255,150,0.98)'
         : 'rgba(255,213,74,0.98)';
       ctx.beginPath();
       ctx.roundRect(barX, barY, Math.max(8, barW * progress), barH, 999);
       ctx.fill();
 
-      ctx.fillStyle = mission.completed ? '#bfffcf' : '#ffffff';
-      ctx.font = 'bold 18px system-ui';
+      ctx.fillStyle = justCompleted ? '#bfffcf' : 'rgba(230,240,255,0.96)';
+      ctx.font = '17px system-ui';
+      ctx.fillText(mission.desc, cardX + 14, y + 58);
+
+      ctx.fillStyle = justCompleted ? '#bfffcf' : '#ffffff';
+      ctx.font = 'bold 16px system-ui';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       ctx.fillText(
-        `${mission.progress}/${mission.target}　+${mission.rewardScore}分`,
-        x + w - 16,
+        `${mission.progress}/${mission.target}  +${mission.rewardScore}分`,
+        cardX + cardW - 14,
         barY + barH / 2
       );
 
