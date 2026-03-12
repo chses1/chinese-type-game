@@ -198,9 +198,9 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   function getEventPool(){
     return [
       {
-        id:'meteorShower', icon:'☄️', label:'流星雨', desc:'額外出現少量流星',
+        id:'meteorShower', icon:'☄️', label:'流星雨', desc:'10 秒內額外落下 3～4 顆流星',
         durationMs: EVENT_DURATION_MS, spawnMul:0.92,
-        guaranteedType:'normal', extraSpawnTotal:2, maxConcurrent:7
+        guaranteedType:'normal', extraSpawnTotal:4, maxConcurrent:8
       },
       {
         id:'goldRush', icon:'✨', label:'黃金時刻', desc:'穩定追加少量黃金隕石',
@@ -208,7 +208,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
         guaranteedType:'gold', extraSpawnTotal:1, maxConcurrent:6
       },
       {
-        id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場慢速，追加少量冰凍隕石',
+        id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場慢速並持續顯示寒流邊框',
         durationMs: EVENT_DURATION_MS, globalSlow:0.82, iceBonus:0.08,
         guaranteedType:'ice', extraSpawnTotal:1, maxConcurrent:6
       }
@@ -238,9 +238,12 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     if (!picked) return;
 
     const now = performance.now();
-    const extraSpawnTotal = Math.max(0, Number(picked.extraSpawnTotal || 0));
+    const randomizedExtraSpawnTotal = picked.id === 'meteorShower'
+      ? (Math.random() < 0.5 ? 3 : 4)
+      : Number(picked.extraSpawnTotal || 0);
+    const extraSpawnTotal = Math.max(0, randomizedExtraSpawnTotal);
     const eventSpacingMs = extraSpawnTotal > 0
-      ? Math.max(spawnInterval() * 1.8, picked.durationMs / extraSpawnTotal)
+      ? Math.max(1800, picked.durationMs / Math.max(1, extraSpawnTotal))
       : Infinity;
 
     activeEvent = {
@@ -849,7 +852,7 @@ function processEventExtraSpawns(deltaMs = 16){
   if ((eventState.extraSpawned || 0) >= (eventState.extraSpawnTotal || 0)) return;
 
   eventExtraSpawnTimer += deltaMs;
-  const interval = Math.max(spawnInterval() * 1.8, Number(eventState.eventSpacingMs || Infinity));
+  const interval = Math.max(1400, Number(eventState.eventSpacingMs || Infinity));
   if (eventExtraSpawnTimer < interval) return;
 
   const currentMeteorCount = meteors.length;

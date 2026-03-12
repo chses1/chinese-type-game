@@ -147,7 +147,7 @@ header .chip {
 .panel .stat{font-weight:700;color:var(--accent)}
 
 /* ===== 成績視窗（已存在，略作微調） ===== */
-#resultBox{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.55); z-index:50; }
+#resultBox{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:12px; background:rgba(0,0,0,.55); z-index:50; }
 #resultCard{ width:min(460px,92vw); background:#0c2a57; border:2px solid rgba(255,255,255,.25); padding:22px; border-radius:16px; box-shadow:0 12px 30px rgba(0,0,0,.55); text-align:center; }
 #resultCard h2{ margin:0 0 12px; color:var(--accent); }
 #resultCard td{ padding:8px; }
@@ -290,8 +290,8 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
 
 .rowBtns{
   display:flex;
-  gap:12px;
-  margin-top:14px;
+  gap:10px;
+  margin-top:10px;
 }
 
 .rowBtns > *{
@@ -301,7 +301,7 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
 }
 
 .loginBtns{
-  margin-top:18px;
+  margin-top:10px;
 }
 
 #teacherOpen,
@@ -352,7 +352,7 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   min-width:min(92vw, 680px);
 }
 #leader th, #leader td{
-  padding:14px 16px;           /* 放大 */
+  padding:12px 14px;           /* 放大 */
   border-bottom:1px solid rgba(255,255,255,.1);
   font-size:20px;              /* 放大字體 */
 }
@@ -429,15 +429,19 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
 /* ===== 超帥結算畫面 ===== */
 #resultCard{
   position:relative;
-  width:min(640px,94vw);
-  padding:24px 22px 22px;
+  width:min(620px,92vw);
+  max-height:min(88dvh,760px);
+  padding:20px 18px 18px;
   border-radius:24px;
-  overflow:hidden;
+  overflow:auto;
+  overscroll-behavior:contain;
   background:linear-gradient(180deg,rgba(7,24,58,.96),rgba(7,20,46,.96));
   border:1.5px solid rgba(255,255,255,.16);
   box-shadow:0 18px 48px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.07);
   text-align:left;
 }
+#resultCard::-webkit-scrollbar{ width:8px; }
+#resultCard::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:999px; }
 #resultCard .resultGlow{
   position:absolute; inset:auto -80px -90px auto; width:240px; height:240px; border-radius:50%;
   background:radial-gradient(circle, rgba(255,213,74,.28), rgba(255,213,74,0) 70%);
@@ -456,44 +460,44 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   box-shadow:0 18px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(255,213,74,.16), 0 0 34px rgba(255,213,74,.20);
 }
 .resultHeader{ text-align:center; position:relative; z-index:1; }
-.resultEyebrow{ font-size:12px; letter-spacing:.22em; color:rgba(197,219,255,.72); margin-bottom:8px; }
-.resultHeader h2{ margin:0; color:#ffe16a; font-size:clamp(28px,4vw,36px); }
-.resultOutcome{ margin-top:10px; font-size:16px; color:rgba(238,245,255,.88); }
+.resultEyebrow{ font-size:11px; letter-spacing:.18em; color:rgba(197,219,255,.72); margin-bottom:6px; }
+.resultHeader h2{ margin:0; color:#ffe16a; font-size:clamp(24px,3.7vw,34px); line-height:1.15; }
+.resultOutcome{ margin-top:8px; font-size:15px; color:rgba(238,245,255,.88); }
 .resultHeroRow{
-  margin-top:18px;
+  margin-top:10px;
   display:grid;
   grid-template-columns:140px 1fr;
-  gap:14px;
+  gap:10px;
   align-items:center;
 }
 .resultGradeWrap{
   background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));
   border:1px solid rgba(255,255,255,.12);
   border-radius:20px;
-  min-height:136px;
+  min-height:124px;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
 }
 .resultGrade{
-  font-size:64px; font-weight:900; line-height:1; color:#ffe16a; text-shadow:0 0 18px rgba(255,213,74,.22);
+  font-size:56px; font-weight:900; line-height:1; color:#ffe16a; text-shadow:0 0 18px rgba(255,213,74,.22);
 }
-.resultGradeLabel{ margin-top:8px; font-size:14px; color:rgba(220,234,255,.72); }
+.resultGradeLabel{ margin-top:6px; font-size:13px; color:rgba(220,234,255,.72); }
 .resultTitleWrap{
-  padding:16px 18px;
+  padding:12px 14px;
   border-radius:20px;
   background:linear-gradient(180deg,rgba(31,72,134,.30),rgba(255,255,255,.03));
   border:1px solid rgba(255,255,255,.10);
 }
-.resultTitle{ font-size:28px; font-weight:900; color:#fff5bd; }
-.resultTitleDesc{ margin-top:8px; font-size:16px; color:rgba(236,244,255,.88); }
-.resultProgressText{ margin-top:8px; font-size:14px; color:#8fc8ff; }
+.resultTitle{ font-size:24px; font-weight:900; color:#fff5bd; }
+.resultTitleDesc{ margin-top:6px; font-size:15px; color:rgba(236,244,255,.88); }
+.resultProgressText{ margin-top:6px; font-size:13px; color:#8fc8ff; }
 .resultStatsGrid{
-  margin-top:16px;
+  margin-top:12px;
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
+  gap:10px;
 }
 .resultStatCard{
-  padding:14px 16px;
+  padding:12px 14px;
   border-radius:18px;
   border:1px solid rgba(255,255,255,.10);
   background:rgba(255,255,255,.045);
@@ -502,19 +506,19 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
 .resultStatCard.bad{ box-shadow:inset 0 0 0 1px rgba(255,107,107,.10); }
 .resultStatCard.acc{ box-shadow:inset 0 0 0 1px rgba(76,175,255,.12); }
 .resultStatCard.speed{ box-shadow:inset 0 0 0 1px rgba(255,213,74,.10); }
-.resultStatLabel{ font-size:14px; color:rgba(215,229,255,.78); }
-.resultStatValue{ margin-top:6px; font-size:34px; font-weight:900; color:#fff; }
-.resultStatUnit{ font-size:15px; color:rgba(215,229,255,.75); }
+.resultStatLabel{ font-size:13px; color:rgba(215,229,255,.78); }
+.resultStatValue{ margin-top:4px; font-size:30px; font-weight:900; color:#fff; }
+.resultStatUnit{ font-size:14px; color:rgba(215,229,255,.75); }
 .resultDefensePanel{
-  margin-top:16px;
-  padding:16px 16px 14px;
+  margin-top:12px;
+  padding:14px 14px 12px;
   border-radius:18px;
   background:linear-gradient(180deg,rgba(12,38,82,.84),rgba(7,23,50,.86));
   border:1px solid rgba(125,185,255,.18);
 }
-.resultDefenseHead{ display:flex; justify-content:space-between; gap:12px; font-size:15px; font-weight:700; color:#d9ecff; }
+.resultDefenseHead{ display:flex; justify-content:space-between; gap:12px; font-size:14px; font-weight:700; color:#d9ecff; }
 .resultDefenseBar{
-  margin-top:10px; height:16px; border-radius:999px; overflow:hidden;
+  margin-top:8px; height:14px; border-radius:999px; overflow:hidden;
   background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.08);
 }
 .resultDefenseFill{
@@ -523,18 +527,18 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   box-shadow:0 0 12px rgba(255,213,74,.28);
   transition:width .45s ease;
 }
-.resultDefenseNote{ margin-top:10px; font-size:15px; line-height:1.6; color:rgba(239,245,255,.92); }
+.resultDefenseNote{ margin-top:8px; font-size:14px; line-height:1.5; color:rgba(239,245,255,.92); }
 .resultMissionSummary{
-  margin-top:14px;
-  display:flex; flex-wrap:wrap; gap:10px;
+  margin-top:10px;
+  display:flex; flex-wrap:wrap; gap:8px;
 }
 .resultMissionChip{
-  padding:10px 12px; border-radius:14px; font-size:14px; line-height:1.4;
+  padding:8px 10px; border-radius:14px; font-size:13px; line-height:1.35;
   background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:#edf4ff;
 }
 .resultMissionChip.done{ border-color:rgba(110,245,160,.28); background:rgba(46,204,113,.10); }
 .resultMissionChip.todo{ border-color:rgba(255,213,74,.18); }
-.resultActionBtn{ margin-top:18px; }
+.resultActionBtn{ margin-top:14px; }
 
 @media (max-width: 640px){
   #resultCard{ padding:20px 16px 18px; border-radius:20px; }
@@ -543,4 +547,19 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   .resultGrade{ font-size:52px; }
   .resultTitle{ font-size:24px; }
   .resultStatsGrid{ grid-template-columns:1fr; }
+}
+
+@media (max-height: 820px){
+  #resultCard{ max-height:86dvh; padding:18px 16px 16px; }
+  .resultHeader h2{ font-size:clamp(22px,3.2vw,30px); }
+  .resultHeroRow{ grid-template-columns:110px 1fr; gap:10px; }
+  .resultGradeWrap{ min-height:104px; }
+  .resultGrade{ font-size:48px; }
+  .resultTitle{ font-size:22px; }
+  .resultStatValue{ font-size:27px; }
+}
+@media (max-height: 700px){
+  #resultCard{ max-height:84dvh; }
+  .resultStatsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .resultMissionChip{ font-size:12px; padding:7px 9px; }
 }
