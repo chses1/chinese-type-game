@@ -148,10 +148,117 @@ header .chip {
 
 /* ===== 成績視窗（已存在，略作微調） ===== */
 #resultBox{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:12px; background:rgba(0,0,0,.55); z-index:50; }
-#resultCard{ width:min(460px,92vw); background:#0c2a57; border:2px solid rgba(255,255,255,.25); padding:22px; border-radius:16px; box-shadow:0 12px 30px rgba(0,0,0,.55); text-align:center; }
-#resultCard h2{ margin:0 0 12px; color:var(--accent); }
-#resultCard td{ padding:8px; }
 
+/* ===== 超帥結算畫面（壓縮版，避免需要滑動） ===== */
+#resultCard{
+  position:relative;
+  width:min(820px,94vw);
+  max-height:min(76dvh,640px);
+  padding:16px 18px 14px;
+  border-radius:24px;
+  overflow:hidden;
+  background:linear-gradient(180deg,rgba(7,24,58,.96),rgba(7,20,46,.96));
+  border:1.5px solid rgba(255,255,255,.16);
+  box-shadow:0 18px 48px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.07);
+  text-align:left;
+}
+#resultCard .resultGlow{
+  position:absolute; inset:auto -80px -90px auto; width:220px; height:220px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,213,74,.28), rgba(255,213,74,0) 70%);
+  pointer-events:none;
+}
+#resultCard.resultThemePass{
+  border-color:rgba(100,235,168,.45);
+  box-shadow:0 18px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(100,235,168,.12), 0 0 28px rgba(46,204,113,.18);
+}
+#resultCard.resultThemeFail{
+  border-color:rgba(255,118,118,.35);
+  box-shadow:0 18px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(255,118,118,.10), 0 0 24px rgba(255,90,90,.14);
+}
+#resultCard.resultThemeLegend{
+  border-color:rgba(255,213,74,.52);
+  box-shadow:0 18px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(255,213,74,.16), 0 0 34px rgba(255,213,74,.20);
+}
+.resultHeader{ text-align:center; position:relative; z-index:1; margin-bottom:8px; }
+.resultEyebrow{ font-size:10px; letter-spacing:.16em; color:rgba(197,219,255,.72); margin-bottom:4px; }
+.resultHeader h2{ margin:0; color:#ffe16a; font-size:clamp(22px,3.1vw,30px); line-height:1.1; }
+.resultOutcome{ margin-top:6px; font-size:14px; color:rgba(238,245,255,.88); }
+.resultHeroRow{
+  margin-top:8px;
+  display:grid;
+  grid-template-columns:120px 1fr;
+  gap:10px;
+  align-items:center;
+}
+.resultGradeWrap{
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:20px;
+  min-height:98px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.resultGrade{
+  font-size:46px; font-weight:900; line-height:1; color:#ffe16a; text-shadow:0 0 18px rgba(255,213,74,.22);
+}
+.resultGradeLabel{ margin-top:4px; font-size:12px; color:rgba(220,234,255,.72); }
+.resultTitleWrap{
+  padding:10px 12px;
+  border-radius:20px;
+  background:linear-gradient(180deg,rgba(31,72,134,.30),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.10);
+}
+.resultTitle{ font-size:22px; font-weight:900; color:#fff5bd; }
+.resultTitleDesc{ margin-top:4px; font-size:14px; color:rgba(236,244,255,.88); }
+.resultProgressText{ margin-top:4px; font-size:12px; color:#8fc8ff; }
+.resultStatsGrid{
+  margin-top:10px;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+}
+.resultStatCard{
+  padding:10px 12px;
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.045);
+}
+.resultStatCard.good{ box-shadow:inset 0 0 0 1px rgba(46,204,113,.12); }
+.resultStatCard.bad{ box-shadow:inset 0 0 0 1px rgba(255,107,107,.10); }
+.resultStatCard.acc{ box-shadow:inset 0 0 0 1px rgba(76,175,255,.12); }
+.resultStatCard.speed{ box-shadow:inset 0 0 0 1px rgba(255,213,74,.10); }
+.resultStatLabel{ font-size:12px; color:rgba(215,229,255,.78); }
+.resultStatValue{ margin-top:3px; font-size:26px; font-weight:900; color:#fff; }
+.resultStatUnit{ font-size:13px; color:rgba(215,229,255,.75); }
+.resultDefensePanel{
+  margin-top:10px;
+  padding:12px 12px 10px;
+  border-radius:18px;
+  background:linear-gradient(180deg,rgba(12,38,82,.84),rgba(7,23,50,.86));
+  border:1px solid rgba(125,185,255,.18);
+}
+.resultDefenseHead{ display:flex; justify-content:space-between; gap:12px; font-size:13px; font-weight:700; color:#d9ecff; }
+.resultDefenseBar{
+  margin-top:6px; height:12px; border-radius:999px; overflow:hidden;
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.08);
+}
+.resultDefenseFill{
+  width:0%; height:100%; border-radius:999px;
+  background:linear-gradient(90deg,#ff6b6b,#ffd54a,#39d98a);
+  box-shadow:0 0 12px rgba(255,213,74,.28);
+  transition:width .45s ease;
+}
+.resultDefenseNote{ margin-top:6px; font-size:13px; line-height:1.45; color:rgba(239,245,255,.92); }
+.resultMissionSummary{
+  margin-top:8px;
+  display:flex; flex-wrap:wrap; gap:6px;
+}
+.resultMissionChip{
+  padding:7px 9px; border-radius:12px; font-size:12px; line-height:1.3;
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:#edf4ff;
+}
+.resultMissionChip.done{ border-color:rgba(110,245,160,.28); background:rgba(46,204,113,.10); }
+.resultMissionChip.todo{ border-color:rgba(255,213,74,.18); }
+.resultActionBtn{ margin-top:10px; min-height:48px; font-size:18px; }
 /* login */
 #login{
   position:fixed;
@@ -212,7 +319,7 @@ header .chip {
 }
 
 .loginTipItem{
-  padding:12px 14px;
+  padding:10px 12px;
   border-radius:14px;
   background:rgba(255,255,255,.06);
   border:1px solid rgba(255,255,255,.08);
@@ -317,249 +424,37 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   border:1px solid rgba(255,255,255,.16);
 }
 
-@media (max-width: 640px){
-  #login{ padding:16px; }
-  #card.loginCard{ padding:22px 18px 18px; border-radius:20px; }
-  .loginSubtitle{ font-size:15px; line-height:1.6; }
-  .loginTips{ gap:8px; margin:14px 0 18px; }
-  .loginTipItem{ font-size:14px; padding:10px 12px; }
-  .loginInput{ height:54px; font-size:22px; }
-  .rowBtns{ gap:10px; }
-  button.primary,
-  .loginMainBtn,
-  #teacherOpen,
-  .loginSubBtn{ font-size:17px; min-height:50px; }
+@media (max-width: 900px){
+  #resultCard{ width:min(700px,94vw); max-height:min(80dvh,640px); padding:16px 14px 14px; border-radius:20px; overflow:auto; }
+  .resultHeroRow{ grid-template-columns:110px 1fr; gap:8px; }
+  .resultStatsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
 }
-/* ===== 置中排行榜（NEW） ===== */
-#leader{
-  position:fixed;
-  inset:0;
-  display:none;                /* 由 JS 加上 .show 時才顯示 */
-  align-items:center;
-  justify-content:center;
-  background:rgba(0,0,0,.55);
-  z-index:40;
-}
-#leader.show{ display:flex; }
-
-#leader table{
-  border-collapse:collapse;
-  background:rgba(12,30,66,.9);
-  backdrop-filter:blur(8px);
-  border:1px solid rgba(255,255,255,.18);
-  border-radius:16px;
-  overflow:hidden;
-  min-width:min(92vw, 680px);
-}
-#leader th, #leader td{
-  padding:12px 14px;           /* 放大 */
-  border-bottom:1px solid rgba(255,255,255,.1);
-  font-size:20px;              /* 放大字體 */
-}
-#leader th{ opacity:.85; font-weight:700; }
-
-#leader + div button,           /* 排行榜下方兩顆按鈕區 */
-#leader .tag{
-  font-size:16px;
-}
-
-/* ===== Toast 放大 ===== */
-.toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:66dvh; background:rgba(0,0,0,.5); padding:16px 24px; border-radius:999px; border:1px solid rgba(255,255,255,.2); font-size:32px; font-weight:700; opacity:0; transition:opacity .25s; z-index:10; }
-.toast.show{ opacity:1; }
-
-/* 新增：估計抬頭高度，讓 canvas 填滿 header 下面到螢幕底部 */
-:root{
-  --headerH: 64px;         /* 視實際高度微調 56~72px 都可 */
-}
-
-/* 讓遊戲畫布延伸到底（在鍵盤後面），這樣鍵盤會蓋到畫布底部 */
-#gameCanvas{
-  display:block;
-  width:100%;
-  height: calc(90dvh - var(--headerH));  /* ⬅ 由原本 58dvh 改成填滿 */
-  background: url("img/earth_bg.png") center calc(100% + var(--kbdShift)) no-repeat;
-  background-size: cover;
-  border-bottom: 2px solid rgba(255,255,255,.08);
-}
-
-/* 鍵盤高度/背景下移量（你已經有，保留即可；需要時微調） */
-:root{
-  --kbdH: 40dvh;
-  --kbdShift: var(--kbdH);
-}
-@media (min-width: 768px){ :root{ --kbdH:36dvh; --kbdShift:var(--kbdH); } }
-@media (min-width:1024px){ :root{ --kbdH:32dvh; --kbdShift:var(--kbdH); } }
-@media (min-aspect-ratio:4/3) and (min-width:1280px){
-  :root{ --kbdH:28dvh; --kbdShift:var(--kbdH); }
-}
-
-/* 鍵盤維持覆蓋最上層 */
-#kbd{ max-height: var(--kbdH); z-index:20; }
-
-
-/* ===== 愛心顯示 ===== */
-#lives{letter-spacing:2px;font-size:20px}
-
-/* ===== 排行榜卷軸版 ===== */
-#leader .leaderCard{
-  width:min(92vw,720px);
-  background:rgba(12,30,66,.94);
-  border:1px solid rgba(255,255,255,.18);
-  border-radius:18px;
-  padding:16px;
-  box-shadow:0 16px 40px rgba(0,0,0,.45);
-}
-#leader .leaderTitleRow{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
-#leader .leaderTitleRow h2{margin:0;color:var(--accent)}
-#leader .leaderMeta{font-size:14px;opacity:.85}
-#leader .leaderTableWrap{
-  max-height:min(58dvh,560px);
-  overflow:auto;
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:14px;
-}
-#leader table{min-width:100%;width:100%}
-#leader thead th{position:sticky;top:0;background:rgba(11,33,72,.98);z-index:1}
-#leader tbody tr.me{background:rgba(255,213,74,.22)}
-#leader tbody tr.me td{font-weight:700;color:#fff4b8}
-#leader tbody tr:nth-child(even):not(.me){background:rgba(255,255,255,.03)}
-#leader tbody tr:last-child td{border-bottom:none}
-
-
-/* ===== 超帥結算畫面 ===== */
-#resultCard{
-  position:relative;
-  width:min(620px,92vw);
-  max-height:min(88dvh,760px);
-  padding:20px 18px 18px;
-  border-radius:24px;
-  overflow:auto;
-  overscroll-behavior:contain;
-  background:linear-gradient(180deg,rgba(7,24,58,.96),rgba(7,20,46,.96));
-  border:1.5px solid rgba(255,255,255,.16);
-  box-shadow:0 18px 48px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.07);
-  text-align:left;
-}
-#resultCard::-webkit-scrollbar{ width:8px; }
-#resultCard::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:999px; }
-#resultCard .resultGlow{
-  position:absolute; inset:auto -80px -90px auto; width:240px; height:240px; border-radius:50%;
-  background:radial-gradient(circle, rgba(255,213,74,.28), rgba(255,213,74,0) 70%);
-  pointer-events:none;
-}
-#resultCard.resultThemePass{
-  border-color:rgba(100,235,168,.45);
-  box-shadow:0 18px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(100,235,168,.12), 0 0 28px rgba(46,204,113,.18);
-}
-#resultCard.resultThemeFail{
-  border-color:rgba(255,118,118,.35);
-  box-shadow:0 18px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(255,118,118,.10), 0 0 24px rgba(255,90,90,.14);
-}
-#resultCard.resultThemeLegend{
-  border-color:rgba(255,213,74,.52);
-  box-shadow:0 18px 48px rgba(0,0,0,.52), 0 0 0 1px rgba(255,213,74,.16), 0 0 34px rgba(255,213,74,.20);
-}
-.resultHeader{ text-align:center; position:relative; z-index:1; }
-.resultEyebrow{ font-size:11px; letter-spacing:.18em; color:rgba(197,219,255,.72); margin-bottom:6px; }
-.resultHeader h2{ margin:0; color:#ffe16a; font-size:clamp(24px,3.7vw,34px); line-height:1.15; }
-.resultOutcome{ margin-top:8px; font-size:15px; color:rgba(238,245,255,.88); }
-.resultHeroRow{
-  margin-top:10px;
-  display:grid;
-  grid-template-columns:140px 1fr;
-  gap:10px;
-  align-items:center;
-}
-.resultGradeWrap{
-  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03));
-  border:1px solid rgba(255,255,255,.12);
-  border-radius:20px;
-  min-height:124px;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-}
-.resultGrade{
-  font-size:56px; font-weight:900; line-height:1; color:#ffe16a; text-shadow:0 0 18px rgba(255,213,74,.22);
-}
-.resultGradeLabel{ margin-top:6px; font-size:13px; color:rgba(220,234,255,.72); }
-.resultTitleWrap{
-  padding:12px 14px;
-  border-radius:20px;
-  background:linear-gradient(180deg,rgba(31,72,134,.30),rgba(255,255,255,.03));
-  border:1px solid rgba(255,255,255,.10);
-}
-.resultTitle{ font-size:24px; font-weight:900; color:#fff5bd; }
-.resultTitleDesc{ margin-top:6px; font-size:15px; color:rgba(236,244,255,.88); }
-.resultProgressText{ margin-top:6px; font-size:13px; color:#8fc8ff; }
-.resultStatsGrid{
-  margin-top:12px;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-.resultStatCard{
-  padding:12px 14px;
-  border-radius:18px;
-  border:1px solid rgba(255,255,255,.10);
-  background:rgba(255,255,255,.045);
-}
-.resultStatCard.good{ box-shadow:inset 0 0 0 1px rgba(46,204,113,.12); }
-.resultStatCard.bad{ box-shadow:inset 0 0 0 1px rgba(255,107,107,.10); }
-.resultStatCard.acc{ box-shadow:inset 0 0 0 1px rgba(76,175,255,.12); }
-.resultStatCard.speed{ box-shadow:inset 0 0 0 1px rgba(255,213,74,.10); }
-.resultStatLabel{ font-size:13px; color:rgba(215,229,255,.78); }
-.resultStatValue{ margin-top:4px; font-size:30px; font-weight:900; color:#fff; }
-.resultStatUnit{ font-size:14px; color:rgba(215,229,255,.75); }
-.resultDefensePanel{
-  margin-top:12px;
-  padding:14px 14px 12px;
-  border-radius:18px;
-  background:linear-gradient(180deg,rgba(12,38,82,.84),rgba(7,23,50,.86));
-  border:1px solid rgba(125,185,255,.18);
-}
-.resultDefenseHead{ display:flex; justify-content:space-between; gap:12px; font-size:14px; font-weight:700; color:#d9ecff; }
-.resultDefenseBar{
-  margin-top:8px; height:14px; border-radius:999px; overflow:hidden;
-  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.08);
-}
-.resultDefenseFill{
-  width:0%; height:100%; border-radius:999px;
-  background:linear-gradient(90deg,#ff6b6b,#ffd54a,#39d98a);
-  box-shadow:0 0 12px rgba(255,213,74,.28);
-  transition:width .45s ease;
-}
-.resultDefenseNote{ margin-top:8px; font-size:14px; line-height:1.5; color:rgba(239,245,255,.92); }
-.resultMissionSummary{
-  margin-top:10px;
-  display:flex; flex-wrap:wrap; gap:8px;
-}
-.resultMissionChip{
-  padding:8px 10px; border-radius:14px; font-size:13px; line-height:1.35;
-  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); color:#edf4ff;
-}
-.resultMissionChip.done{ border-color:rgba(110,245,160,.28); background:rgba(46,204,113,.10); }
-.resultMissionChip.todo{ border-color:rgba(255,213,74,.18); }
-.resultActionBtn{ margin-top:14px; }
 
 @media (max-width: 640px){
-  #resultCard{ padding:20px 16px 18px; border-radius:20px; }
+  #resultCard{ width:min(94vw,560px); max-height:84dvh; padding:16px 12px 14px; border-radius:18px; overflow:auto; }
   .resultHeroRow{ grid-template-columns:1fr; }
-  .resultGradeWrap{ min-height:112px; }
-  .resultGrade{ font-size:52px; }
-  .resultTitle{ font-size:24px; }
+  .resultGradeWrap{ min-height:96px; }
+  .resultGrade{ font-size:44px; }
+  .resultTitle{ font-size:20px; }
   .resultStatsGrid{ grid-template-columns:1fr; }
 }
 
 @media (max-height: 820px){
-  #resultCard{ max-height:86dvh; padding:18px 16px 16px; }
+  #resultCard{ max-height:78dvh; padding:15px 14px 13px; overflow:auto; }
   .resultHeader h2{ font-size:clamp(22px,3.2vw,30px); }
-  .resultHeroRow{ grid-template-columns:110px 1fr; gap:10px; }
-  .resultGradeWrap{ min-height:104px; }
-  .resultGrade{ font-size:48px; }
-  .resultTitle{ font-size:22px; }
-  .resultStatValue{ font-size:27px; }
+  .resultHeroRow{ grid-template-columns:108px 1fr; gap:8px; }
+  .resultGradeWrap{ min-height:92px; }
+  .resultGrade{ font-size:42px; }
+  .resultTitle{ font-size:20px; }
+  .resultStatValue{ font-size:24px; }
 }
 @media (max-height: 700px){
-  #resultCard{ max-height:84dvh; }
+  #resultCard{ max-height:76dvh; }
   .resultStatsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
   .resultMissionChip{ font-size:12px; padding:7px 9px; }
+}
+
+@media (min-width: 900px) and (max-height: 900px){
+  #resultCard{ max-height:72dvh; }
+  .resultStatsGrid{ grid-template-columns:repeat(4,minmax(0,1fr)); }
 }

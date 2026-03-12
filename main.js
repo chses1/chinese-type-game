@@ -113,6 +113,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let activeMissions = [];
   let missionStats = null;
   let missionSnapshot = [];
+  let roundMissionHistory = [];
   let activeEvent = null;
   let eventTriggerTimes = [];
   let lastEventTriggerTime = null;
@@ -162,7 +163,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
     const freshMission = createMission(carry.map(m => m.id));
     activeMissions = [...carry, freshMission];
-    missionSnapshot = activeMissions.map(cloneMission);
+    roundMissionHistory = activeMissions.map(cloneMission);
+    missionSnapshot = roundMissionHistory.map(cloneMission);
   }
 
   function resetMissionAndEvents({ keepExisting = true } = {}){
@@ -192,7 +194,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   }
 
   function snapshotCurrentMissions(){
-    missionSnapshot = activeMissions.map(cloneMission);
+    const source = roundMissionHistory.length ? roundMissionHistory : activeMissions;
+    missionSnapshot = source.map(cloneMission);
   }
 
   function getEventPool(){
@@ -259,23 +262,14 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     // 事件顯示統一交給上方常駐狀態列，避免同時跳出多個重複提示
   }
 
-  function pruneFinishedMissions(now = performance.now()){
-    const before = activeMissions.length;
-    activeMissions = activeMissions.filter(m => !m.completed || !m.completedAt || (now - m.completedAt) < 1000);
-    if (before !== activeMissions.length) {
-      snapshotCurrentMissions();
-    }
-  }
-
   function getMissionDisplayList(now = performance.now()){
-    pruneFinishedMissions(now);
     return activeMissions.filter(m => !m.completed || !m.completedAt || (now - m.completedAt) < 1000);
   }
 
   function updateMissionProgress(){
     if (!activeMissions.length || !missionStats) return;
 
-    activeMissions.forEach((mission, index) => {
+    activeMissions.forEach((mission) => {
       const progress = Math.max(0, Number(missionStats[mission.statKey] || 0));
       mission.progress = Math.min(mission.target, progress);
       if (!mission.completed && progress >= mission.target) {
@@ -289,6 +283,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       }
     });
 
+    roundMissionHistory = activeMissions.map(cloneMission);
     snapshotCurrentMissions();
   }
 
@@ -1637,7 +1632,7 @@ async function endAndShowLeader(){
     const shieldPct = Math.max(8, Math.min(100, accPct));
     const grade = getBattleGrade(acc);
     const titleData = getDefenseTitle(acc);
-    const missionsForResult = missionSnapshot.length ? missionSnapshot : activeMissions;
+    const missionsForResult = missionSnapshot.length ? missionSnapshot : (roundMissionHistory.length ? roundMissionHistory : activeMissions);
 
     if ($('resCorrect')) $('resCorrect').textContent = correct;
     if ($('resWrong'))   $('resWrong').textContent   = wrong;
