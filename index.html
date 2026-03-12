@@ -56,16 +56,57 @@
 
 <!-- Result Modal -->
 <div id="resultBox">
-  <div id="resultCard">
-    <h2>打字結果</h2>
-    <table>
-      <tr><td class="good">打對：</td><td id="resCorrect">0</td><td>字</td></tr>
-      <tr><td class="bad">打錯：</td><td id="resWrong">0</td><td>字</td></tr>
-      <tr><td>正確率：</td><td id="resAcc">0%</td><td></td></tr>
-      <tr><td>速度：</td><td id="resSpeed">0</td><td>字/分</td></tr>
-      <tr><td>升級資格：</td><td id="resPromo">—</td><td>(門檻 80%)</td></tr>
-    </table>
-    <button id="resultPrimaryBtn" class="primary">再玩一次</button>
+  <div id="resultCard" class="resultThemeFail">
+    <div class="resultGlow"></div>
+    <div class="resultHeader">
+      <div class="resultEyebrow">MISSION REPORT</div>
+      <h2>🌍 地球防衛戰報告</h2>
+      <div id="resultOutcome" class="resultOutcome">本回合結算完成</div>
+    </div>
+
+    <div class="resultHeroRow">
+      <div class="resultGradeWrap">
+        <div id="resGrade" class="resultGrade">B</div>
+        <div class="resultGradeLabel">任務評級</div>
+      </div>
+      <div class="resultTitleWrap">
+        <div id="resTitle" class="resultTitle">🛰️ 偵察員</div>
+        <div id="resTitleDesc" class="resultTitleDesc">持續練習，守住地球！</div>
+        <div id="resProgressText" class="resultProgressText">距離下一級還差一點</div>
+      </div>
+    </div>
+
+    <div class="resultStatsGrid">
+      <div class="resultStatCard good">
+        <div class="resultStatLabel">☄️ 擊落隕石</div>
+        <div id="resCorrect" class="resultStatValue">0</div>
+      </div>
+      <div class="resultStatCard bad">
+        <div class="resultStatLabel">💥 漏掉隕石</div>
+        <div id="resWrong" class="resultStatValue">0</div>
+      </div>
+      <div class="resultStatCard acc">
+        <div class="resultStatLabel">🎯 命中率</div>
+        <div id="resAcc" class="resultStatValue">0%</div>
+      </div>
+      <div class="resultStatCard speed">
+        <div class="resultStatLabel">⚡ 反應速度</div>
+        <div><span id="resSpeed" class="resultStatValue">0</span><span class="resultStatUnit"> 字/分</span></div>
+      </div>
+    </div>
+
+    <div class="resultDefensePanel">
+      <div class="resultDefenseHead">
+        <span>🛡️ 地球防衛狀態</span>
+        <span id="resShield">0%</span>
+      </div>
+      <div class="resultDefenseBar"><div id="resShieldFill" class="resultDefenseFill"></div></div>
+      <div id="resPromo" class="resultDefenseNote">—</div>
+    </div>
+
+    <div id="resMissionSummary" class="resultMissionSummary"></div>
+
+    <button id="resultPrimaryBtn" class="primary resultActionBtn">再玩一次</button>
   </div>
 </div>
 

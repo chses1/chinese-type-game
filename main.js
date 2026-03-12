@@ -1602,25 +1602,80 @@ async function endAndShowLeader(){
       endGame();
     } },1000); }
 
+
+  function getBattleGrade(acc){
+    if (acc >= 1) return 'SS';
+    if (acc >= 0.95) return 'S';
+    if (acc >= 0.90) return 'A+';
+    if (acc >= 0.80) return 'A';
+    if (acc >= 0.70) return 'B';
+    if (acc >= 0.60) return 'C';
+    return 'D';
+  }
+
+  function getDefenseTitle(acc){
+    if (acc >= 1) return { title:'⭐ 宇宙傳奇', desc:'完美攔截，全宇宙都會記住你。', next:'你已達到最高稱號！' };
+    if (acc >= 0.90) return { title:'🌍 地球英雄', desc:'你的命中率已能穩定守住地球。', next:'再提高到 100% 可成為「宇宙傳奇」' };
+    if (acc >= 0.80) return { title:'🛡️ 行星守衛', desc:'你已具備通關實力，是可靠的防衛隊員。', next:'再提高到 90% 可成為「地球英雄」' };
+    if (acc >= 0.70) return { title:'☄️ 隕石獵人', desc:'反應不錯，再穩定一點就能守住防線。', next:'再提高到 80% 可成為「行星守衛」' };
+    if (acc >= 0.60) return { title:'🛰️ 偵察員', desc:'你已經開始掌握戰場節奏。', next:'再提高到 70% 可成為「隕石獵人」' };
+    return { title:'🚧 新兵', desc:'先求穩定命中，再追求更快速度。', next:'先提高到 60% 可升為「偵察員」' };
+  }
+
+  function buildResultOutcomeText({ passed, gameOver, livesLeft, acc }){
+    if (gameOver) return '💀 地球防線崩潰，請重新整備後再出發';
+    if (passed) return livesLeft >= MAX_LIVES ? '✅ 防衛成功！地球毫髮無傷，愛心已滿' : `✅ 防衛成功！補回一顆愛心，目前 ${livesLeft}/${MAX_LIVES}`;
+    const needPct = Math.max(0, Math.ceil((ACC_THRESHOLD - acc) * 100));
+    return `⚠️ 防線仍有缺口，再提升約 ${needPct}% 命中率就能過關`;
+  }
+
   function showResult({correct, wrong, acc, speed, passed, livesLeft = lives, gameOver = false}){
+    const accPct = Math.round(acc * 100);
+    const shieldPct = Math.max(8, Math.min(100, accPct));
+    const grade = getBattleGrade(acc);
+    const titleData = getDefenseTitle(acc);
+    const missionsForResult = missionSnapshot.length ? missionSnapshot : activeMissions;
+
     if ($('resCorrect')) $('resCorrect').textContent = correct;
     if ($('resWrong'))   $('resWrong').textContent   = wrong;
-    if ($('resAcc'))     $('resAcc').textContent     = Math.round(acc*100) + '%';
+    if ($('resAcc'))     $('resAcc').textContent     = accPct + '%';
     if ($('resSpeed'))   $('resSpeed').textContent   = Math.round(speed);
+    if ($('resGrade'))   $('resGrade').textContent   = grade;
+    if ($('resTitle'))   $('resTitle').textContent   = titleData.title;
+    if ($('resTitleDesc')) $('resTitleDesc').textContent = titleData.desc;
+    if ($('resProgressText')) $('resProgressText').textContent = titleData.next;
+    if ($('resultOutcome')) $('resultOutcome').textContent = buildResultOutcomeText({ passed, gameOver, livesLeft, acc });
+    if ($('resShield')) $('resShield').textContent = shieldPct + '%';
+    if ($('resShieldFill')) $('resShieldFill').style.width = shieldPct + '%';
 
     const promoEl = $('resPromo');
     if (promoEl) {
-      const missionsForResult = missionSnapshot.length ? missionSnapshot : activeMissions;
-      const missionLine = missionsForResult.length
-        ? '｜' + missionsForResult.map(m => `🎯 ${m.title} ${m.completed ? '已完成' : `${m.progress}/${m.target}`}`).join('｜')
-        : '';
       if (gameOver) {
-        promoEl.textContent = '💀 愛心用完' + missionLine;
+        promoEl.textContent = '💀 地球遭到重創，本次作戰已結束。';
       } else if (passed) {
-        promoEl.textContent = `✅ 達標（愛心 ${livesLeft}/${MAX_LIVES}）` + missionLine;
+        promoEl.textContent = `✅ 本關達標，成功守住地球防線！（升級門檻 ${Math.round(ACC_THRESHOLD * 100)}%）`;
       } else {
-        promoEl.textContent = `❌ 未達標（剩 ${livesLeft} 顆）` + missionLine;
+        promoEl.textContent = `❌ 本關未達標，目前還差 ${Math.max(0, Math.ceil((ACC_THRESHOLD - acc) * 100))}% 命中率。`;
       }
+    }
+
+    const missionBox = $('resMissionSummary');
+    if (missionBox) {
+      missionBox.innerHTML = missionsForResult.length
+        ? missionsForResult.map(m => {
+            const stateClass = m.completed ? 'done' : 'todo';
+            const stateText = m.completed ? `完成 +${m.rewardScore}分` : `${m.progress}/${m.target}`;
+            return `<div class="resultMissionChip ${stateClass}">${m.icon} <b>${m.title}</b>｜${stateText}</div>`;
+          }).join('')
+        : '<div class="resultMissionChip todo">本回合沒有任務紀錄</div>';
+    }
+
+    const card = $('resultCard');
+    if (card) {
+      card.classList.remove('resultThemePass', 'resultThemeFail', 'resultThemeLegend');
+      if (acc >= 0.95) card.classList.add('resultThemeLegend');
+      else if (passed) card.classList.add('resultThemePass');
+      else card.classList.add('resultThemeFail');
     }
 
     const btn = $('resultPrimaryBtn');
@@ -1635,7 +1690,7 @@ async function endAndShowLeader(){
         freshBtn.textContent = '查看排行榜';
         freshBtn.disabled = true;
       } else if (passed) {
-        freshBtn.textContent = '挑戰下一關';
+        freshBtn.textContent = '🚀 挑戰下一關';
         freshBtn.onclick = () => {
           closeResult();
           gameEnded = false;
@@ -1643,7 +1698,7 @@ async function endAndShowLeader(){
           startGame();
         };
       } else {
-        freshBtn.textContent = '再挑戰本關';
+        freshBtn.textContent = '🛠 再挑戰本關';
         freshBtn.onclick = () => {
           closeResult();
           gameEnded = false;
