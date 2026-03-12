@@ -703,7 +703,11 @@ const keyPositions = {};
     ['ㄈ','ㄌ','ㄏ','ㄒ','ㄖ','ㄙ','ㄩ','ㄝ','ㄡ','ㄥ','__RESTART__']
   ];
 
-  const kbd=$('kbd'); if(!kbd) return;
+  const kbd=$('kbd'); 
+  if(!kbd) return;
+
+  Object.keys(keyPositions).forEach(k => delete keyPositions[k]);
+
   kbd.innerHTML='';
   rows.forEach(r=>{
     const row=document.createElement('div'); row.className='row';
