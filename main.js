@@ -116,6 +116,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let activeEvent = null;
   let eventTriggerTimes = [];
   let lastEventTriggerTime = null;
+  let eventExtraSpawnTimer = 0;
+  let bossPhaseSpawnTimer = 0;
 
   function showCenterNotice(text, life = 1600, type = 'info') {
     const now = performance.now();
@@ -174,6 +176,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
     activeEvent = null;
     lastEventTriggerTime = null;
+    eventExtraSpawnTimer = 0;
+    bossPhaseSpawnTimer = 0;
 
     const roundDuration = (LEVELS[level - 1]?.duration) || 60;
 
@@ -194,9 +198,9 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   function getEventPool(){
     return [
-      { id:'meteorShower', icon:'☄️', label:'流星雨', desc:'生成量上升', durationMs: EVENT_DURATION_MS, spawnMul:0.55 },
-      { id:'goldRush', icon:'✨', label:'黃金時刻', desc:'黃金隕石大增', durationMs: EVENT_DURATION_MS, goldBonus:0.26, bossPenalty:0.02 },
-      { id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場慢速，冰凍隕石增加', durationMs: EVENT_DURATION_MS, globalSlow:0.78, iceBonus:0.18 }
+      { id:'meteorShower', icon:'☄️', label:'流星雨', desc:'生成量上升', durationMs: EVENT_DURATION_MS, spawnMul:0.55, guaranteedType:'normal', extraSpawnInterval:700, extraSpawnBurst:1 },
+      { id:'goldRush', icon:'✨', label:'黃金時刻', desc:'黃金隕石大增', durationMs: EVENT_DURATION_MS, goldBonus:0.26, bossPenalty:0.02, guaranteedType:'gold', extraSpawnInterval:950, extraSpawnBurst:1 },
+      { id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場慢速，冰凍隕石增加', durationMs: EVENT_DURATION_MS, globalSlow:0.78, iceBonus:0.18, guaranteedType:'ice', extraSpawnInterval:1050, extraSpawnBurst:1 }
     ];
   }
 
@@ -224,8 +228,41 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
     const now = performance.now();
     activeEvent = { ...picked, startsAt: now, endsAt: now + picked.durationMs };
+    eventExtraSpawnTimer = 0;
 
     // 事件顯示統一交給上方常駐狀態列，避免同時跳出多個重複提示
+  }
+
+  function processEventExtraSpawns(deltaMs = 16){
+    const eventState = getEventState();
+    if (!eventState?.guaranteedType || !running) {
+      eventExtraSpawnTimer = 0;
+      return;
+    }
+
+    eventExtraSpawnTimer += deltaMs;
+    const interval = Math.max(220, Number(eventState.extraSpawnInterval || 900));
+    while (eventExtraSpawnTimer >= interval) {
+      eventExtraSpawnTimer -= interval;
+      const burst = Math.max(1, Number(eventState.extraSpawnBurst || 1));
+      for (let i = 0; i < burst; i++) {
+        spawnMeteor(eventState.guaranteedType);
+      }
+    }
+  }
+
+  function processBossPhaseExtraSpawns(deltaMs = 16){
+    if (!running || !isBossPhase()) {
+      bossPhaseSpawnTimer = 0;
+      return;
+    }
+
+    bossPhaseSpawnTimer += deltaMs;
+    const interval = 1200;
+    while (bossPhaseSpawnTimer >= interval) {
+      bossPhaseSpawnTimer -= interval;
+      spawnMeteor('boss');
+    }
   }
 
   function pruneFinishedMissions(now = performance.now()){
@@ -254,14 +291,6 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
           mission.rewardClaimed = true;
           score += mission.rewardScore;
           setScore();
-          addScorePopup(
-            W * 0.5,
-            Math.max(120, H * 0.22) + index * 34,
-            `🎯 ${mission.title} +${mission.rewardScore}`,
-            'mission',
-            1200
-          );
-          showCenterNotice(`🎯 任務完成：${mission.title}`, 1500, 'mission');
         }
       }
     });
@@ -307,14 +336,19 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       const y = layout.y;
       const progress = Math.max(0, Math.min(1, mission.progress / mission.target));
       const justCompleted = mission.completed && mission.completedAt && (now - mission.completedAt) < 1000;
-      const fade = justCompleted ? Math.max(0, 1 - ((now - mission.completedAt) / 1000)) : 1;
+      const completeRatio = justCompleted ? ((now - mission.completedAt) / 1000) : 1;
+      const glowAlpha = justCompleted ? Math.max(0, 1 - completeRatio) : 0;
 
       ctx.save();
-      ctx.globalAlpha = fade;
 
-      ctx.fillStyle = justCompleted ? 'rgba(18, 56, 34, 0.90)' : 'rgba(8, 18, 38, 0.88)';
+      if (justCompleted) {
+        ctx.shadowColor = `rgba(140,255,170,${0.95 * glowAlpha})`;
+        ctx.shadowBlur = 26 + 18 * glowAlpha;
+      }
+
+      ctx.fillStyle = justCompleted ? 'rgba(18, 56, 34, 0.94)' : 'rgba(8, 18, 38, 0.88)';
       ctx.strokeStyle = justCompleted
-        ? 'rgba(130,255,160,0.98)'
+        ? `rgba(130,255,160,${0.8 + 0.2 * glowAlpha})`
         : 'rgba(110,190,255,0.88)';
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -758,10 +792,7 @@ const keyPositions = {};
 
   function applyKbdPref(){ const k=$('kbd'); if(!k) return; const compact=localStorage.getItem('kbd-compact')==='1'; k.classList.toggle('compact',compact); }
 
-function spawn(){
-  const label = ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
-
-  // 四種隕石機率（最後 12 秒進入 Boss 波次）
+function chooseMeteorType(){
   let type = 'normal';
   const eventState = getEventState();
   const r = Math.random();
@@ -775,17 +806,18 @@ function spawn(){
   if (r < bossChance) type = 'boss';
   else if (r < bossChance + iceChance) type = 'ice';
   else if (r < bossChance + iceChance + goldChance) type = 'gold';
+  return type;
+}
 
-  // ✅ NEW: 隕石瞄準「對應注音鍵」
+function spawnMeteor(forceType = null, forceLabel = null){
+  const label = forceLabel || ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
+  const type = forceType || chooseMeteorType();
+
   const targetKey = label;
-  if (!keyPositions[targetKey]) return;
+  if (!keyPositions[targetKey]) return false;
   const target = keyPositions[targetKey];
 
-  // ✅ NEW: 掉落方向規則（避免距離太短來不及按）
-  // - 左邊的「聲母」(SHENGMU) → 從右側出現，飛向左側鍵盤區
-  // - 右邊的「韻母/介音/聲調」→ 從左側出現，飛向右側鍵盤區
-  const fromLeft = !SHENGMU.has(label); // 非聲母 → 視為右側群組 → 從左邊出現
-
+  const fromLeft = !SHENGMU.has(label);
   const startX = fromLeft ? -60 : W + 60;
   const startY = -80;
 
@@ -805,9 +837,6 @@ function spawn(){
   const hp = (type === 'boss') ? 3 : 1;
   const sizeMul = (type === 'boss') ? 1.35 : (type === 'gold' ? 1.08 : (type === 'ice' ? 1.08 : 1.0));
 
-  // ✅ NEW: Boss 出現警告
-  if (type === 'boss' && typeof toast === 'function') toast('⚠️ Boss 隕石！');
-
   meteors.push({
     x: startX,
     y: startY,
@@ -818,6 +847,11 @@ function spawn(){
     sizeMul,
     born: performance.now()
   });
+  return true;
+}
+
+function spawn(){
+  spawnMeteor();
 }
   function drawBackground(){
     ctx.clearRect(0,0,W,H);
@@ -1399,6 +1433,8 @@ function spawn(){
       const spawnRateMul = eventState?.spawnMul || 1;
       spawnTimer += 16;
       if (spawnTimer > (spawnInterval() * spawnRateMul)) { spawn(); spawnTimer = 0; }
+      processEventExtraSpawns(16);
+      processBossPhaseExtraSpawns(16);
       const f = 1 + 0.08 * (level - 1); // ✅ 等級加速，但不要太兇（0.08 比 0.1 更溫和）
 const slow = (performance.now() < slowUntil) ? SLOW_FACTOR : 1;
 const eventSlow = eventState?.globalSlow || 1;
@@ -1462,6 +1498,8 @@ meteors.forEach(m => {
     comboEnergy = 0;
     comboBoostUntil = 0;
     dangerMode = false;
+    eventExtraSpawnTimer = 0;
+    bossPhaseSpawnTimer = 0;
     setDangerUI();
 
     // 清除暫存特效，避免學生利用停留畫面判讀
