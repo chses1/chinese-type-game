@@ -1403,19 +1403,31 @@ function spawn(){
   for (let i = explosions.length - 1; i >= 0; i--) {
     const e = explosions[i];
     const t = (now - e.t0) / e.life;
-    if (t >= 1) { explosions.splice(i, 1); continue; }
-    const r = 20 + t * 110;
+
+    // 尚未到開始時間，先不要畫，避免半徑變成負數造成 Canvas 報錯
+    if (t < 0) continue;
+
+    if (t >= 1) {
+      explosions.splice(i, 1);
+      continue;
+    }
+
+    const r = Math.max(0.1, 20 + t * 110);
 
     ctx.save();
-    ctx.globalAlpha = 1 - t;
+    ctx.globalAlpha = Math.max(0, 1 - t);
 
     ctx.lineWidth = 8;
     ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+    ctx.stroke();
 
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255,215,0,0.8)';
-    ctx.beginPath(); ctx.arc(e.x, e.y, r * 0.6, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, Math.max(0.1, r * 0.6), 0, Math.PI * 2);
+    ctx.stroke();
 
     ctx.restore();
   }
