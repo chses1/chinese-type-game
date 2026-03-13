@@ -42,6 +42,47 @@ document.addEventListener('DOMContentLoaded', () => {
   
     const ctx = canvas.getContext('2d');
 
+  function roundRectPath(x, y, w, h, r = 12) {
+    const rr = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, h, rr);
+      return;
+    }
+    ctx.moveTo(x + rr, y);
+    ctx.lineTo(x + w - rr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+    ctx.lineTo(x + w, y + h - rr);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+    ctx.lineTo(x + rr, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+    ctx.lineTo(x, y + rr);
+    ctx.quadraticCurveTo(x, y, x + rr, y);
+    ctx.closePath();
+  }
+
+  function setImageSrcFromCandidates(img, paths) {
+    const candidates = Array.isArray(paths) ? paths.filter(Boolean) : [paths].filter(Boolean);
+    let index = 0;
+    const tryNext = () => {
+      if (index >= candidates.length) return;
+      img.src = candidates[index++];
+    };
+    img.onerror = () => {
+      if (index < candidates.length) {
+        tryNext();
+      } else {
+        console.warn('❌ 圖片載入失敗：', candidates.join(' / '));
+      }
+    };
+    tryNext();
+  }
+
+  const earthBgImg = new Image();
+  let earthBgReady = false;
+  earthBgImg.onload = () => { earthBgReady = true; draw(); };
+  setImageSrcFromCandidates(earthBgImg, ['earth_bg.png', './earth_bg.png', 'img/earth_bg.png', './img/earth_bg.png']);
+
   // ===== 四種隕石圖片（請放在 /img/ 目錄）=====
   const meteorImgs = {
     normal: new Image(),
@@ -50,19 +91,18 @@ document.addEventListener('DOMContentLoaded', () => {
     boss:   new Image(),
   };
 
-  meteorImgs.normal.src = "img/meteor_normal.png";
-  meteorImgs.gold.src   = "img/meteor_gold.png";
-  meteorImgs.ice.src    = "img/meteor_ice.png";
-  meteorImgs.boss.src   = "img/meteor_boss.png";
-
   const imgReady = { normal:false, gold:false, ice:false, boss:false };
+
+  const meteorImageCandidates = {
+    normal: ['meteor_normal.png', './meteor_normal.png', 'img/meteor_normal.png', './img/meteor_normal.png'],
+    gold:   ['meteor_gold.png', './meteor_gold.png', 'img/meteor_gold.png', './img/meteor_gold.png'],
+    ice:    ['meteor_ice.png', './meteor_ice.png', 'img/meteor_ice.png', './img/meteor_ice.png'],
+    boss:   ['meteor_boss.png', './meteor_boss.png', 'img/meteor_boss.png', './img/meteor_boss.png'],
+  };
 
   for (const [k,img] of Object.entries(meteorImgs)) {
     img.onload  = () => { imgReady[k] = true; };
-    img.onerror = () => {
-      console.warn("❌ 隕石圖片載入失敗：", img.src);
-      imgReady[k] = false;
-    };
+    setImageSrcFromCandidates(img, meteorImageCandidates[k]);
   }
 
   const ZHUYIN=['ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ','ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ','ㄧ','ㄨ','ㄩ','ㄚ','ㄛ','ㄜ','ㄝ','ㄞ','ㄟ','ㄠ','ㄡ','ㄢ','ㄣ','ㄤ','ㄥ','ㄦ','ˇ','ˋ','ˊ','˙'
@@ -335,8 +375,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
         ? 'rgba(130,255,160,0.98)'
         : 'rgba(110,190,255,0.88)';
       ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.roundRect(x, y, layout.w, layout.h, layout.radius);
+      roundRectPath(x, y, layout.w, layout.h, layout.radius);
       ctx.fill();
       ctx.stroke();
 
@@ -359,15 +398,13 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       ctx.fillText(`${mission.progress}/${mission.target}  +${mission.rewardScore}分`, innerX, innerY + 28);
 
       ctx.fillStyle = 'rgba(255,255,255,0.16)';
-      ctx.beginPath();
-      ctx.roundRect(barX, barY, barW, barH, 999);
+      roundRectPath(barX, barY, barW, barH, 999);
       ctx.fill();
 
       ctx.fillStyle = justCompleted
         ? 'rgba(120,255,150,0.98)'
         : 'rgba(255,213,74,0.98)';
-      ctx.beginPath();
-      ctx.roundRect(barX, barY, Math.max(8, barW * progress), barH, 999);
+      roundRectPath(barX, barY, Math.max(8, barW * progress), barH, 999);
       ctx.fill();
 
       ctx.restore();
@@ -896,6 +933,9 @@ function spawn(){
 }
   function drawBackground(){
     ctx.clearRect(0,0,W,H);
+    if (earthBgReady) {
+      ctx.drawImage(earthBgImg, 0, 0, W, H);
+    }
     ctx.fillStyle='rgba(255,255,255,.8)';
     for(let i=0;i<40;i++){ const x=(i*97%W), y=(i*181%H); ctx.globalAlpha=(i%5)/5+.2; ctx.fillRect(x,y,3,3); }
     ctx.globalAlpha=1;
@@ -1184,16 +1224,14 @@ function spawn(){
   ctx.fillStyle = 'rgba(8, 18, 38, 0.90)';
   ctx.strokeStyle = comboBoostActive ? 'rgba(255,220,110,0.98)' : 'rgba(110,190,255,0.88)';
   ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(barX, barY, barW, barH, hudLayout.radius);
+  roundRectPath(barX, barY, barW, barH, hudLayout.radius);
   ctx.fill();
   ctx.stroke();
 
   const fillPad = 4;
   const fillW = (barW - fillPad * 2) * Math.max(0, Math.min(1, comboEnergy / 100));
   ctx.fillStyle = comboBoostActive ? 'rgba(255,215,80,0.96)' : 'rgba(80,220,255,0.96)';
-  ctx.beginPath();
-  ctx.roundRect(barX + fillPad, barY + fillPad, Math.max(0, fillW), barH - fillPad * 2, hudLayout.radius);
+  roundRectPath(barX + fillPad, barY + fillPad, Math.max(0, fillW), barH - fillPad * 2, hudLayout.radius);
   ctx.fill();
 
   ctx.fillStyle = '#ffffff';
