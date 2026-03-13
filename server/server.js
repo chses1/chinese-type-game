@@ -21,7 +21,61 @@ const ROOT_DIR   = ["index.html", "teacher.html", "main.js", "style.css"].every(
 const SERVER_DIR = __dirname;
 
 const app = express();
-app.use(express.json());
+app.disable("x-powered-by");
+app.use(express.json({ limit: "32kb" }));
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  next();
+});
+
+function getClientIp(req) {
+  const xff = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return xff || req.socket?.remoteAddress || "unknown";
+}
+
+function createRateLimiter({ windowMs, max, keyFn, message = "too_many_requests" }) {
+  const buckets = new Map();
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = String((keyFn ? keyFn(req) : getClientIp(req)) || "anonymous");
+    const row = buckets.get(key);
+    if (!row || now >= row.resetAt) {
+      buckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    row.count += 1;
+    if (row.count > max) {
+      const retryAfter = Math.max(1, Math.ceil((row.resetAt - now) / 1000));
+      res.setHeader("Retry-After", String(retryAfter));
+      return res.status(429).json({ ok: false, error: message, retryAfterSec: retryAfter });
+    }
+    next();
+  };
+}
+
+const adminLoginRateLimit = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  keyFn: req => `admin-login:${getClientIp(req)}`,
+  message: "too_many_admin_login_attempts"
+});
+
+const heartbeatRateLimit = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyFn: req => `heartbeat:${String(req.body?.sid || getClientIp(req))}`,
+  message: "heartbeat_rate_limited"
+});
+
+const classroomStateRateLimit = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 90,
+  keyFn: req => `classroom-state:${getClientIp(req)}`,
+  message: "classroom_state_rate_limited"
+});
 
 // 避免教室競賽狀態被瀏覽器或代理快取，造成老師已開啟但前端仍顯示未開啟
 app.use("/api", (_req, res, next) => {
@@ -47,6 +101,12 @@ const mongoUri = process.env.MONGODB_URI;
 const dbName   = process.env.DB_NAME || "zhuyin";
 
 let client, db, students, classroomStates;
+const CLASSES_CACHE_TTL_MS = 30000;
+let classesCache = { data: null, expiresAt: 0 };
+
+function invalidateClassesCache() {
+  classesCache = { data: null, expiresAt: 0 };
+}
 
 async function initMongo() {
   if (!mongoUri) {
@@ -61,6 +121,9 @@ async function initMongo() {
     classroomStates = db.collection("classroom_states");
     await students.createIndex({ sid: 1 }, { unique: true });
     await students.createIndex({ best: -1, updatedAt: -1 });
+    await students.createIndex({ lastSeenAt: -1 });
+    await students.createIndex({ sid: 1, lastSeenAt: -1 });
+    await students.createIndex({ lastSeenAt: -1, currentScore: -1, best: -1, sid: 1 });
     await classroomStates.createIndex({ key: 1 }, { unique: true });
     await classroomStates.updateOne(
       { key: "global" },
@@ -110,6 +173,7 @@ app.post("/api/upsert-student", async (req, res) => {
     { $setOnInsert: { best: 0, createdAt: now }, $set: { name, updatedAt: now } },
     { upsert: true }
   );
+  invalidateClassesCache();
   const doc = await students.findOne({ sid: String(sid) }, { projection: { _id: 0, sid: 1, name: 1, best: 1 } });
   res.json({ ok: true, data: doc });
 });
@@ -126,6 +190,7 @@ app.post("/api/update-best", async (req, res) => {
     { sid: String(sid) },
     { $set: { best, updatedAt: new Date() } }
   );
+  invalidateClassesCache();
   res.json({ ok: true, data: { sid: String(sid), best } });
 });
 
@@ -145,7 +210,7 @@ app.get("/api/leaderboard", async (req, res) => {
   res.json({ ok: true, data: list });
 });
 
-app.post("/api/student/heartbeat", async (req, res) => {
+app.post("/api/student/heartbeat", heartbeatRateLimit, async (req, res) => {
   if (!requireDB(res)) return;
   const { sid, score = 0, status = "online", classroom = false } = req.body || {};
   if (!/^\d{5}$/.test(String(sid))) return res.status(400).json({ ok: false, error: "sid_invalid" });
@@ -164,6 +229,7 @@ app.post("/api/student/heartbeat", async (req, res) => {
     },
     { upsert: true }
   );
+  invalidateClassesCache();
   res.json({ ok: true, data: { sid: String(sid), lastSeenAt: now } });
 });
 
@@ -176,8 +242,15 @@ app.get("/api/student/:sid", async (req, res) => {
 });
 
 // 班級統計
-app.get("/api/classes", async (_req, res) => {
+app.get("/api/classes", async (req, res) => {
   if (!requireDB(res)) return;
+  const forceRefresh = req.query.refresh === "1";
+  const now = Date.now();
+
+  if (!forceRefresh && classesCache.data && now < classesCache.expiresAt) {
+    return res.json({ ok: true, data: classesCache.data, cached: true, cacheTtlMs: Math.max(0, classesCache.expiresAt - now) });
+  }
+
   const pipeline = [
     { $project: { _id: 0, sid: 1, best: 1, class: { $substr: ["$sid", 0, 3] } } },
     { $group:   { _id: "$class", count: { $sum: 1 }, top: { $max: "$best" }, avg: { $avg: "$best" } } },
@@ -185,7 +258,8 @@ app.get("/api/classes", async (_req, res) => {
     { $sort:    { class: 1 } }
   ];
   const data = await students.aggregate(pipeline).toArray();
-  res.json({ ok: true, data });
+  classesCache = { data, expiresAt: now + CLASSES_CACHE_TTL_MS };
+  res.json({ ok: true, data, cached: false, cacheTtlMs: CLASSES_CACHE_TTL_MS });
 });
 
 app.get("/api/admin/online-students", adminAuth, async (req, res) => {
@@ -270,7 +344,7 @@ async function normalizeClassroomState() {
   return classroomState;
 }
 
-app.get("/api/classroom/state", async (_req, res) => {
+app.get("/api/classroom/state", classroomStateRateLimit, async (_req, res) => {
   const s = await normalizeClassroomState();
   res.json({ ok: true, data: { ...s, now: Date.now() } });
 });
@@ -279,6 +353,13 @@ app.get("/api/classroom/state", async (_req, res) => {
 const TEACHER_TOKEN = process.env.TEACHER_TOKEN;
 const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const adminSessions = new Map();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of adminSessions.entries()) {
+    if (!session || session.expiresAt <= now) adminSessions.delete(token);
+  }
+}, 10 * 60 * 1000).unref?.();
 
 function createAdminSession() {
   const sessionToken = crypto.randomBytes(32).toString("hex");
@@ -302,7 +383,7 @@ function adminAuth(req, res, next) {
   next();
 }
 
-app.post("/api/admin/login", (req, res) => {
+app.post("/api/admin/login", adminLoginRateLimit, (req, res) => {
   if (!TEACHER_TOKEN) {
     return res.status(500).json({ ok: false, error: "teacher_token_not_set" });
   }
@@ -331,6 +412,7 @@ app.post("/api/admin/clear-class", adminAuth, async (req, res) => {
     } else {
       await students.updateMany(filter, { $set: { best: 0 } });
     }
+    invalidateClassesCache();
     res.json({ ok:true });
   } catch (e) {
     res.status(500).json({ ok:false, error:e.message });
@@ -347,6 +429,7 @@ app.post("/api/admin/clear-all", adminAuth, async (req, res) => {
     } else {
       await students.updateMany({}, { $set: { best: 0 } });
     }
+    invalidateClassesCache();
     res.json({ ok:true });
   } catch (e) {
     res.status(500).json({ ok:false, error:e.message });
