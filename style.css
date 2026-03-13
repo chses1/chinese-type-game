@@ -38,9 +38,9 @@ header .chip span {
 }
 
 #chipHint {
-  flex:1.12 1 0;
+  flex:1.35 1 0;
   min-width:0;
-  font-size:clamp(15px,1.1vw,19px);
+  font-size:inherit;
   line-height:1.15;
   white-space:nowrap;
   overflow:hidden;

@@ -2225,6 +2225,30 @@ async function endAndShowLeader(){
     updatePauseButton();
   }
 
+  function jumpToLevel(targetLevel){
+    const maxLevel = LEVELS.length;
+    const nextLevel = Math.max(1, Math.min(maxLevel, Number(targetLevel) || 1));
+
+    level = nextLevel;
+    gameEnded = false;
+    running = false;
+    clearInterval(timerId);
+
+    // 保留登入狀態與目前累積分數，只重置當前關卡戰況
+    resetRoundState({ keepExisting:false });
+
+    setScore();
+    setLives();
+    updateStageChip();
+    closeResult();
+
+    if (finalVictory?.active) finishFinalVictorySequence(true);
+
+    toast && toast(`🛰️ 已跳到第 ${level} 關：${LEVEL_NAMES[level - 1] || ''}`);
+    updatePauseButton();
+    draw();
+  }
+
   // 排行榜（教師按鈕在遊戲頁也可用）
   async function openLeader() {
     const closeBtn = $('btnCloseLeader');
@@ -2331,6 +2355,20 @@ async function endAndShowLeader(){
 
   // 實體鍵盤
   addEventListener('keydown',e=>{
+    // Shift + 數字：快速跳關（Shift+0 = 第10關）
+    if (e.shiftKey) {
+      if (/^[1-9]$/.test(e.key)) {
+        e.preventDefault();
+        jumpToLevel(Number(e.key));
+        return;
+      }
+      if (e.key === '0') {
+        e.preventDefault();
+        jumpToLevel(10);
+        return;
+      }
+    }
+
     if(e.key===' '){ e.preventDefault(); toggleRun(); return; }
     if(e.key==='Escape'){ pauseGame(); return; }
     if(ZHUYIN.includes(e.key)){ pressKey(e.key); }
