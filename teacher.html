@@ -3,177 +3,213 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>教師後台｜地球保衛戰</title>
+  <title>地球防衛指揮中心｜地球保衛戰</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    html, body{
-      width:100%;
-      min-height:100%;
-      margin:0;
-      overflow-x:hidden;
-      overflow-y:auto;
-    }
-
+    html, body{ width:100%; min-height:100%; margin:0; overflow-x:hidden; overflow-y:auto; }
     body{
-      background: radial-gradient(1200px 600px at 60% -10%, #0f274f 0%, #08182e 60%, #061225 100%) fixed;
+      background:
+        radial-gradient(1200px 700px at 50% -10%, rgba(53,124,255,.30), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(84,255,233,.10), transparent 60%),
+        linear-gradient(180deg, #061225 0%, #071933 45%, #081a37 100%);
+      color:#eef6ff;
     }
-
-    .container{
-      max-width: 1280px;
-      margin: 24px auto;
-      padding: 0 16px 32px;
+    body::before{
+      content:''; position:fixed; inset:0; pointer-events:none; opacity:.12;
+      background-image:
+        linear-gradient(rgba(120,180,255,.15) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120,180,255,.12) 1px, transparent 1px);
+      background-size: 28px 28px;
+      mask-image: linear-gradient(180deg, rgba(0,0,0,.95), rgba(0,0,0,.55));
     }
+    .container{ max-width:1360px; margin:0 auto; padding:0 16px 26px; }
+    .commandTitle{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .commandTitle h1{ margin:0; font-size:clamp(2rem,4vw,3rem); letter-spacing:.05em; }
+    .subTitle{ color:#9fd3ff; opacity:.9; }
+    header.top{ position:sticky; top:0; z-index:20; padding:14px 0 10px; backdrop-filter: blur(10px); background:linear-gradient(180deg, rgba(4,14,31,.92), rgba(4,14,31,.68), rgba(4,14,31,.18)); border-bottom:1px solid rgba(143,211,255,.15); }
+    .headRow{ display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    .headActions{ display:flex; gap:10px; flex-wrap:wrap; }
 
-    .card{
-      background: rgba(12,30,66,.88);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255,255,255,.15);
-      border-radius: 16px;
-      padding: 16px;
+    .hudGrid{ display:grid; grid-template-columns: repeat(4, minmax(160px,1fr)); gap:14px; margin-top:16px; }
+    .hudCard, .panel, .tabPanel, .miniPanel{ position:relative; background:linear-gradient(180deg, rgba(12,29,63,.90), rgba(8,22,48,.92)); border:1px solid rgba(133,195,255,.16); border-radius:20px; box-shadow:0 14px 40px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05); }
+    .hudCard{ padding:14px 16px; overflow:hidden; }
+    .hudCard::after, .panel::after, .tabPanel::after, .miniPanel::after{ content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; box-shadow: inset 0 0 0 1px rgba(140,214,255,.06), 0 0 30px rgba(71,131,255,.05); }
+    .hudLabel{ font-size:.9rem; color:#98c6ff; margin-bottom:8px; }
+    .hudValue{ font-size:clamp(1.2rem,2.5vw,2rem); font-weight:800; letter-spacing:.03em; }
+    .hudHint{ margin-top:6px; color:#a9c9e8; font-size:.85rem; opacity:.88; }
+
+    .tabs{ display:flex; gap:10px; flex-wrap:wrap; margin:20px 0 14px; }
+    .tabBtn{ appearance:none; border:1px solid rgba(129,200,255,.18); background:rgba(19,42,81,.72); color:#dff0ff; border-radius:14px; padding:10px 16px; font-weight:700; cursor:pointer; }
+    .tabBtn.active{ background:linear-gradient(180deg, rgba(48,110,255,.88), rgba(31,84,213,.88)); box-shadow:0 8px 24px rgba(41,104,255,.24); }
+    .tabPanel{ display:none; padding:16px; }
+    .tabPanel.active{ display:block; }
+
+    .overviewGrid{ display:grid; grid-template-columns: 1.15fr .85fr; gap:16px; }
+    .panel{ padding:16px; }
+    .sectionTitle{ display:flex; align-items:center; gap:8px; font-size:1.15rem; font-weight:800; margin:0 0 12px; }
+    .sectionDesc{ color:#a9c9e8; font-size:.9rem; margin:-2px 0 14px; }
+
+    .controlGrid{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
+    .formCard{ padding:14px; border-radius:16px; background:rgba(7,20,44,.55); border:1px solid rgba(129,200,255,.10); }
+    .label{ display:block; margin-bottom:6px; color:#a4cbff; font-size:.92rem; }
+    input, select{ width:100%; }
+    .btnRow{ display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-top:12px; }
+    .btnRow > *{ min-width:0; }
+    .primary, .ghost, .tag, .warnBtn, .eventBtn, .missionBtn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:48px; border-radius:14px; font-weight:800; }
+    .primary{ background:linear-gradient(180deg, #3d8bff, #2561de); border:1px solid rgba(122,185,255,.35); }
+    .ghost, .tag, .warnBtn, .eventBtn, .missionBtn{ background:rgba(26,49,92,.82); border:1px solid rgba(129,200,255,.16); color:#eff8ff; }
+    .danger{ border-color:rgba(255,106,106,.45)!important; color:#ffd1d1!important; }
+    .warning{ border-color:rgba(255,181,90,.42)!important; color:#ffe3b4!important; }
+    .eventGrid, .missionGrid, .classChipGrid{ display:grid; gap:10px; }
+    .eventGrid{ grid-template-columns: repeat(4, 1fr); }
+    .missionGrid{ grid-template-columns: repeat(3, 1fr); }
+    .classChipGrid{ grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .eventBtn, .missionBtn{ min-height:70px; padding:10px 12px; flex-direction:column; text-align:center; }
+    .eventBtn small, .missionBtn small{ color:#9fc4e4; font-weight:600; }
+    .eventBtn.cooling, .missionBtn.cooling{ opacity:.6; pointer-events:none; }
+    .statusStrip{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:12px; }
+    .miniPanel{ padding:12px 14px; }
+    .stateBadge{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background:rgba(31,66,120,.70); border:1px solid rgba(135,208,255,.18); }
+    .stateBadge.running{ background:rgba(25,91,61,.72); border-color:rgba(110,255,190,.28); }
+    .stateBadge.countdown{ background:rgba(98,71,14,.70); border-color:rgba(255,220,133,.28); }
+    .stateBadge.paused{ background:rgba(74,51,110,.72); border-color:rgba(200,168,255,.24); }
+    .stateBadge.idle{ background:rgba(30,54,92,.72); }
+    .stateBadge.alert{ background:rgba(120,40,40,.72); border-color:rgba(255,150,150,.26); }
+
+    .dualTables{ display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+    .tableWrap{ max-height:420px; overflow:auto; border-radius:16px; border:1px solid rgba(129,200,255,.08); background:rgba(6,18,39,.55); }
+    table{ width:100%; border-collapse:collapse; }
+    th, td{ padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.08); text-align:left; }
+    th{ position:sticky; top:0; background:rgba(8,22,48,.98); color:#a6d4ff; z-index:2; }
+    tr.top1 td{ background:rgba(255,208,87,.10); }
+    tr.top2 td{ background:rgba(184,214,255,.08); }
+    tr.top3 td{ background:rgba(255,158,112,.08); }
+    .muted{ color:#98b7d8; font-size:.9rem; }
+    .dangerZone{ display:grid; grid-template-columns: 1fr auto auto; gap:10px; align-items:end; }
+
+    #classList.collapsed .extraChip{ display:none; }
+    .showMoreWrap{ margin-top:10px; display:flex; justify-content:center; }
+    #toast{ position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(10px); opacity:0; pointer-events:none; transition:.2s; z-index:50; background:rgba(10,26,54,.94); color:#fff; padding:10px 16px; border-radius:999px; border:1px solid rgba(136,206,255,.20); box-shadow:0 12px 28px rgba(0,0,0,.35); }
+    #toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+    @media (max-width: 1120px){
+      .hudGrid, .statusStrip{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .overviewGrid, .dualTables{ grid-template-columns:1fr; }
+      .eventGrid{ grid-template-columns:repeat(2,1fr); }
+      .missionGrid{ grid-template-columns:repeat(2,1fr); }
+      .classChipGrid{ grid-template-columns:repeat(3, minmax(0,1fr)); }
+      .btnRow{ grid-template-columns: repeat(2,1fr); }
+      .controlGrid{ grid-template-columns:1fr; }
+      .dangerZone{ grid-template-columns:1fr; }
     }
-
-    h1{ margin: 0; }
-
-    .row{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:flex-end;
-      margin-top:8px;
-    }
-
-    .row > *{
-      flex:1;
-      min-width: 200px;
-    }
-
-    table{
-      width:100%;
-      border-collapse: collapse;
-      background: rgba(8,22,48,.9);
-      border-radius: 12px;
-      overflow:hidden;
-    }
-
-    th,td{
-      padding:12px 14px;
-      border-bottom:1px solid rgba(255,255,255,.08);
-    }
-
-    th{
-      opacity:.85;
-      text-align:left;
-      position: sticky;
-      top: 0;
-      background: rgba(8,22,48,.98);
-      z-index: 1;
-    }
-
-    .toolbar{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-
-    .toolbar .tag,
-    .toolbar .primary,
-    .toolbar .ghost{
-      flex:1;
-      min-width: 160px;
-    }
-
-    .danger{ border-color:#ff3b3b !important; color:#ffbdbd !important; }
-    .warning{ border-color:#ff6b6b !important; color:#ffb3b3 !important; }
-
-    header.top{
-      position:sticky;
-      top:0;
-      z-index:10;
-      background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,.18),transparent);
-      padding:8px 0;
-      backdrop-filter: blur(6px);
-    }
-
-    .muted{ opacity:.75; font-size:.9rem; }
-    .sectionTitle{ margin:0 0 10px; font-size:1.15rem; }
-
-    .tableWrap{
-      max-height: 360px;
-      overflow:auto;
-      border-radius:12px;
-      border: 1px solid rgba(255,255,255,.06);
-    }
-
-    .grid2{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:16px;
-      margin-top:16px;
-    }
-
-    .grid1{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:16px;
-      margin-top:16px;
-    }
-
-    .toolbarTop{
-      display:flex;
-      gap:10px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-
-    .toolbarTop h1{
-      flex:1;
-      min-width: 180px;
-    }
-
-    @media (max-width: 980px){
-      .grid2{ grid-template-columns:1fr; }
-      .container{ padding: 0 12px 28px; }
+    @media (max-width: 700px){
+      .container{ padding:0 12px 24px; }
+      .hudGrid, .statusStrip, .eventGrid, .missionGrid, .classChipGrid{ grid-template-columns:1fr; }
+      .btnRow{ grid-template-columns:1fr; }
+      .headActions{ width:100%; }
+      .headActions > *{ flex:1; }
     }
   </style>
 </head>
 <body>
   <header class="top">
-    <div class="container toolbarTop">
-      <h1>教師後台</h1>
-      <a href="/" class="tag" style="flex:0 0 auto">⬅️ 回到遊戲</a>
+    <div class="container headRow">
+      <div class="commandTitle">
+        <div style="font-size:2rem">🛰️</div>
+        <div>
+          <h1>地球防衛指揮中心</h1>
+          <div class="subTitle">Earth Defense Command｜教師後台</div>
+        </div>
+      </div>
+      <div class="headActions">
+        <button id="btnRefreshOverview" class="tag">🔄 重新整理</button>
+        <a href="/" class="tag">⬅️ 回到遊戲</a>
+      </div>
     </div>
   </header>
 
-  <div id="lock" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:30">
-    <div class="card" style="width:min(420px,92vw);text-align:center">
-      <h2 style="margin:.2rem 0 1rem">輸入教師密碼</h2>
+  <div id="lock" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.66);z-index:60; padding:16px;">
+    <div class="panel" style="width:min(460px,92vw); padding:22px; text-align:center;">
+      <div style="font-size:2.2rem; margin-bottom:6px;">🔐</div>
+      <h2 style="margin:.2rem 0 1rem; font-size:1.6rem;">輸入教師密碼</h2>
+      <div class="muted" style="margin-bottom:12px;">解鎖後即可管理班級競賽、手動派送事件卡與任務卡。</div>
       <input id="lockPass" type="password" placeholder="教師密碼" />
-      <div style="display:flex;gap:8px;margin-top:10px">
-        <button id="lockEnter" class="primary">解鎖進入</button>
-        <a href="/" class="ghost">返回首頁</a>
+      <div style="display:flex;gap:8px;margin-top:12px; flex-wrap:wrap;">
+        <button id="lockEnter" class="primary" style="flex:1 1 180px;">解鎖進入</button>
+        <a href="/" class="ghost" style="flex:1 1 140px; text-decoration:none;">返回首頁</a>
       </div>
-      <div class="muted" style="margin-top:8px">密碼只在送出解鎖當下用來向伺服器換取暫時的管理權杖，不會直接保存在前端。</div>
     </div>
   </div>
 
   <main id="app" class="container" style="display:none">
-    <div class="card">
-      <div class="toolbar">
-        <button id="btnLoadClasses" class="tag">重新載入班級清單</button>
-        <button id="btnShowAll" class="tag">顯示全部排行</button>
+    <section class="hudGrid">
+      <div class="hudCard">
+        <div class="hudLabel">目前班級</div>
+        <div id="hudClass" class="hudValue">—</div>
+        <div class="hudHint">目前操作中的競賽班級</div>
       </div>
+      <div class="hudCard">
+        <div class="hudLabel">競賽狀態</div>
+        <div id="hudStatus" class="hudValue">未開啟</div>
+        <div class="hudHint">倒數 / 進行中 / 暫停</div>
+      </div>
+      <div class="hudCard">
+        <div class="hudLabel">在線人數</div>
+        <div id="hudOnline" class="hudValue">0</div>
+        <div class="hudHint">最近 15 秒仍在線的學生</div>
+      </div>
+      <div class="hudCard">
+        <div class="hudLabel">目前第一名</div>
+        <div id="hudLeader" class="hudValue">—</div>
+        <div class="hudHint">即時排行榜領先者</div>
+      </div>
+    </section>
 
-      <div class="grid2">
-        <div class="card">
-          <h2 class="sectionTitle">班級排行管理</h2>
+    <nav class="tabs">
+      <button class="tabBtn active" data-tab="overview">🛰️ 戰情總覽</button>
+      <button class="tabBtn" data-tab="control">🎮 競賽控制</button>
+      <button class="tabBtn" data-tab="data">🗂️ 資料管理</button>
+    </nav>
 
-          <div class="row">
-            <div>
-              <label>班級前三碼（例如 301）</label>
-              <input id="classPrefix" placeholder="301" maxlength="3" inputmode="numeric" required pattern="\d{3}" />
+    <section id="tab-overview" class="tabPanel active">
+      <div class="overviewGrid">
+        <div class="panel">
+          <h2 class="sectionTitle">🧭 戰況總覽</h2>
+          <div class="sectionDesc">集中顯示目前班級競賽狀態、全班戰術事件與全班任務卡。</div>
+          <div class="statusStrip">
+            <div class="miniPanel">
+              <div class="muted">目前狀態</div>
+              <div id="ccStateBadge" class="stateBadge idle" style="margin-top:8px;">未開啟</div>
             </div>
-            <div>
-              <label>排行筆數</label>
+            <div class="miniPanel">
+              <div class="muted">戰術事件</div>
+              <div id="activeEventText" style="font-size:1.1rem; font-weight:800; margin-top:8px;">目前無事件</div>
+            </div>
+            <div class="miniPanel">
+              <div class="muted">全班任務</div>
+              <div id="activeMissionText" style="font-size:1.1rem; font-weight:800; margin-top:8px;">目前無指定任務</div>
+            </div>
+          </div>
+          <div class="muted" id="directiveHint" style="margin-top:12px;">老師可在「競賽控制」頁籤派送事件卡或任務卡，改變班級競賽節奏。</div>
+        </div>
+        <div class="panel">
+          <h2 class="sectionTitle">📡 快速操作</h2>
+          <div class="sectionDesc">先選班級，再決定要開始、暫停、重新開始，或派送特殊效果。</div>
+          <div class="controlGrid">
+            <div class="formCard">
+              <label class="label">競賽班級（三碼）</label>
+              <input id="ccClassPrefix" placeholder="301" maxlength="3" inputmode="numeric" />
+            </div>
+            <div class="formCard">
+              <label class="label">倒數秒數</label>
+              <select id="ccCountdown">
+                <option value="3">3 秒</option>
+                <option value="5">5 秒</option>
+                <option value="8">8 秒</option>
+              </select>
+            </div>
+            <div class="formCard">
+              <label class="label">班級排行榜筆數</label>
               <select id="lbLimit">
                 <option>10</option>
                 <option>20</option>
@@ -181,122 +217,120 @@
                 <option>100</option>
               </select>
             </div>
-            <div style="flex:0 0 auto">
-              <button id="btnLoadClassRank" class="primary">載入班內排行</button>
-            </div>
           </div>
-
-          <div class="row">
-            <div class="muted" style="flex:1 1 auto">
-              先於上方輸入教師密碼解鎖後再操作。清除功能僅在已解鎖狀態下啟用。
-            </div>
-            <div style="flex:0 0 auto; display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-              <button id="btnClearClass" class="ghost warning">🧹 清除此班級紀錄</button>
-              <button id="btnClearAll" class="ghost danger">🗑️ 清除全部學生紀錄</button>
-            </div>
-          </div>
-
-          <div class="tableWrap" style="margin-top:12px">
-            <table>
-              <thead>
-                <tr><th style="width:64px">#</th><th>學號</th><th style="width:120px">最佳</th></tr>
-              </thead>
-              <tbody id="teacherLbBody">
-                <tr><td colspan="3">尚未載入資料</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2 class="sectionTitle">教室競賽控制</h2>
-
-          <div class="row">
-            <div>
-              <label>競賽班級（三碼）</label>
-              <input id="ccClassPrefix" placeholder="301" maxlength="3" inputmode="numeric" />
-            </div>
-            <div>
-              <label>倒數秒數</label>
-              <select id="ccCountdown">
-                <option value="3">3 秒</option>
-                <option value="5">5 秒</option>
-              </select>
-            </div>
-            <div>
-              <label>目前狀態</label>
-              <div id="ccState" class="tag" style="width:100%">未開啟</div>
-            </div>
-          </div>
-
-          <div class="toolbar" style="margin-top:12px">
-            <button id="btnCcOpen" class="tag">🏫 開啟班級競賽</button>
+          <div class="btnRow">
+            <button id="btnCcOpen" class="ghost">🏫 開啟競賽</button>
             <button id="btnCcStart" class="primary">▶️ 全班開始</button>
-            <button id="btnCcPause" class="tag">⏸️ 全班暫停</button>
-            <button id="btnCcRestart" class="tag">🔄 全班重來</button>
+            <button id="btnCcPause" class="ghost">⏸️ 全班暫停</button>
+            <button id="btnCcRestart" class="ghost warning">🔄 全班重來</button>
             <button id="btnCcClose" class="ghost danger">⛔ 結束競賽</button>
           </div>
-
-          <div class="muted" style="margin-top:10px">
-            開啟後，該班學生登入會進入等待畫面；老師按「全班開始」後，全班同步倒數開始。學生仍可在沒有開啟競賽時自由練習。
-          </div>
         </div>
       </div>
 
-      <div class="grid2">
-        <div class="card">
-          <h2 class="sectionTitle">學生登入監看</h2>
-          <div class="muted" style="margin-bottom:10px">顯示最近 15 秒內仍在線上的學生。</div>
+      <div class="dualTables" style="margin-top:16px;">
+        <div class="panel">
+          <h2 class="sectionTitle">🏆 即時排行榜</h2>
           <div class="tableWrap">
             <table>
               <thead>
-                <tr>
-                  <th style="width:64px">#</th>
-                  <th>學號</th>
-                  <th style="width:120px">目前分數</th>
-                  <th style="width:120px">狀態</th>
-                  <th style="width:180px">最後回報</th>
-                </tr>
+                <tr><th style="width:64px">#</th><th>學號</th><th style="width:120px">目前分數</th><th style="width:120px">最佳</th><th style="width:120px">狀態</th></tr>
               </thead>
-              <tbody id="onlineStudentsBody">
-                <tr><td colspan="5">尚未載入資料</td></tr>
-              </tbody>
+              <tbody id="liveRankBody"><tr><td colspan="5">尚未載入資料</td></tr></tbody>
             </table>
           </div>
         </div>
-
-        <div class="card">
-          <h2 class="sectionTitle">競賽即時排行榜</h2>
-          <div class="muted" style="margin-bottom:10px">依目前分數即時排序。</div>
+        <div class="panel">
+          <h2 class="sectionTitle">👀 在線學生</h2>
           <div class="tableWrap">
             <table>
               <thead>
-                <tr>
-                  <th style="width:64px">#</th>
-                  <th>學號</th>
-                  <th style="width:120px">目前分數</th>
-                  <th style="width:120px">最佳紀錄</th>
-                  <th style="width:120px">狀態</th>
-                </tr>
+                <tr><th style="width:64px">#</th><th>學號</th><th style="width:120px">目前分數</th><th style="width:120px">狀態</th><th style="width:160px">最後回報</th></tr>
               </thead>
-              <tbody id="liveRankBody">
-                <tr><td colspan="5">尚未載入資料</td></tr>
-              </tbody>
+              <tbody id="onlineStudentsBody"><tr><td colspan="5">尚未載入資料</td></tr></tbody>
             </table>
           </div>
         </div>
       </div>
+    </section>
 
-      <div class="grid1">
-        <div class="card">
-          <h2 class="sectionTitle">班級清單</h2>
-          <div id="classList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    <section id="tab-control" class="tabPanel">
+      <div class="panel">
+        <h2 class="sectionTitle">🎯 戰術事件控制</h2>
+        <div class="sectionDesc">事件卡會立即套用到目前競賽中的班級，影響該班所有學生的遊戲節奏。每次派送後有短暫冷卻，避免連續誤觸。</div>
+        <div class="eventGrid">
+          <button class="eventBtn" data-event="meteorShower"><span>☄️ 流星雨</span><small>10 秒內額外掉落 3～4 顆</small></button>
+          <button class="eventBtn" data-event="iceWind"><span>🧊 冰風暴</span><small>全場減速並顯示寒流邊框</small></button>
+          <button class="eventBtn" data-event="goldRush"><span>✨ 黃金時刻</span><small>黃金隕石機率提高</small></button>
+          <button class="eventBtn" data-event="bossWave"><span>👾 Boss 波次</span><small>立即進入 Boss 壓力波</small></button>
         </div>
       </div>
-    </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <h2 class="sectionTitle">📝 全班任務卡控制</h2>
+        <div class="sectionDesc">派送後會直接替換該班目前顯示的任務卡，讓老師可在競賽中主動調整挑戰目標。</div>
+        <div class="missionGrid">
+          <button class="missionBtn" data-mission="goldHunter"><span>✨ 黃金獵人</span><small>打中 3 顆黃金隕石</small></button>
+          <button class="missionBtn" data-mission="iceBreaker"><span>❄️ 冰凍專家</span><small>打中 2 顆冰凍隕石</small></button>
+          <button class="missionBtn" data-mission="comboMaster"><span>🔥 連擊高手</span><small>達成 10 連擊</small></button>
+          <button class="missionBtn" data-mission="quickShot"><span>⚡ 快速反應</span><small>完成 5 次快速擊落</small></button>
+          <button class="missionBtn" data-mission="bossBreaker"><span>👾 Boss 剋星</span><small>命中 Boss 4 次</small></button>
+          <button class="missionBtn" data-mission="random"><span>🎲 隨機任務</span><small>系統隨機派送一張任務</small></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-data" class="tabPanel">
+      <div class="panel">
+        <h2 class="sectionTitle">📚 班級排行管理</h2>
+        <div class="sectionDesc">查看班內排行、全班統計，或清除紀錄。危險操作已獨立放在下方，降低誤按機率。</div>
+        <div class="controlGrid">
+          <div class="formCard">
+            <label class="label">班級前三碼（例如 301）</label>
+            <input id="classPrefix" placeholder="301" maxlength="3" inputmode="numeric" required pattern="\d{3}" />
+          </div>
+          <div class="formCard" style="display:flex; align-items:flex-end;">
+            <button id="btnLoadClassRank" class="primary" style="width:100%;">載入班內排行</button>
+          </div>
+          <div class="formCard" style="display:flex; align-items:flex-end;">
+            <button id="btnShowAll" class="ghost" style="width:100%;">顯示全部排行</button>
+          </div>
+        </div>
+
+        <div class="tableWrap" style="margin-top:14px; max-height:480px;">
+          <table>
+            <thead><tr><th style="width:64px">#</th><th>學號</th><th style="width:120px">最佳</th></tr></thead>
+            <tbody id="teacherLbBody"><tr><td colspan="3">尚未載入資料</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="panel" style="margin-top:16px; background:rgba(58,18,24,.26); border-color:rgba(255,110,128,.20);">
+          <h3 class="sectionTitle">⚠️ 危險操作區</h3>
+          <div class="dangerZone">
+            <div class="muted">請先確認班級後再操作。這些功能只在教師解鎖狀態下可用。</div>
+            <button id="btnClearClass" class="ghost warning">🧹 清除此班級紀錄</button>
+            <button id="btnClearAll" class="ghost danger">🗑️ 清除全部學生紀錄</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div>
+            <h2 class="sectionTitle" style="margin-bottom:4px;">🧩 班級清單</h2>
+            <div class="sectionDesc" style="margin:0;">縮成膠囊排版，點一下即可帶入班級欄位與競賽班級欄位。</div>
+          </div>
+          <div>
+            <button id="btnLoadClasses" class="tag">重新載入班級清單</button>
+          </div>
+        </div>
+        <div id="classList" class="classChipGrid collapsed" style="margin-top:14px;"></div>
+        <div class="showMoreWrap"><button id="btnToggleClasses" class="ghost" style="display:none;">展開全部班級</button></div>
+      </div>
+    </section>
   </main>
 
-  <div class="toast" id="toast"></div>
+  <div id="toast"></div>
   <script src="teacher.js"></script>
 </body>
 </html>

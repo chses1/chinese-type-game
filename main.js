@@ -229,6 +229,26 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     return { ...picked, progress: 0, completed: false, rewardClaimed: false };
   }
 
+  function findMissionById(id){
+    return buildMissionPool().find(m => m.id === id) || null;
+  }
+
+  function createMissionFromId(id){
+    if (id === 'random') return createMission();
+    const picked = findMissionById(id);
+    return picked ? { ...picked, progress: 0, completed: false, rewardClaimed: false } : createMission();
+  }
+
+  function findEventById(id){
+    if (id === 'bossWave') {
+      return {
+        id:'bossWave', icon:'👾', label:'Boss 波次', desc:'10 秒內提高 Boss 壓力，額外出現 2 顆 Boss',
+        durationMs: EVENT_DURATION_MS, bossPenalty:0, guaranteedType:'boss', extraSpawnTotal:2, maxConcurrent:6, extraSpeedMul:1.06
+      };
+    }
+    return getEventPool().find(e => e.id === id) || null;
+  }
+
   function prepareMissionsForRound({ keepExisting = true } = {}){
     const carry = keepExisting
       ? activeMissions
@@ -336,6 +356,41 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     eventExtraSpawnTimer = 0;
 
     // 事件顯示統一交給上方常駐狀態列，避免同時跳出多個重複提示
+  }
+
+  function applyForcedEventById(eventId, source = 'teacher'){
+    const picked = findEventById(eventId);
+    if (!picked) return false;
+
+    const now = performance.now();
+    const randomizedExtraSpawnTotal = picked.id === 'meteorShower'
+      ? (Math.random() < 0.5 ? 3 : 4)
+      : Number(picked.extraSpawnTotal || 0);
+    const extraSpawnTotal = Math.max(0, randomizedExtraSpawnTotal);
+    const eventSpacingMs = extraSpawnTotal > 0
+      ? Math.max(1800, picked.durationMs / Math.max(1, extraSpawnTotal))
+      : Infinity;
+
+    activeEvent = {
+      ...picked,
+      startsAt: now,
+      endsAt: now + picked.durationMs,
+      extraSpawnTotal,
+      extraSpawned: 0,
+      eventSpacingMs
+    };
+    eventExtraSpawnTimer = 0;
+    showCenterNotice(`${picked.icon || '🌀'} ${picked.label}`, 1400, 'event');
+    return true;
+  }
+
+  function applyForcedMissionById(missionId, source = 'teacher'){
+    const mission = createMissionFromId(missionId);
+    activeMissions = [mission];
+    roundMissionHistory = activeMissions.map(cloneMission);
+    missionSnapshot = roundMissionHistory.map(cloneMission);
+    showCenterNotice(`${mission.icon || '🎯'} 任務：${mission.title}`, 1400, 'mission');
+    return true;
   }
 
   function getMissionDisplayList(now = performance.now()){
@@ -547,6 +602,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let classroomCountdownEnd = 0;
   let classroomCurrentClass = '';
   let classroomRoundStarted = false;
+  let classroomLastEventNonce = 0;
+  let classroomLastMissionNonce = 0;
+  let classroomForcedEventId = '';
+  let classroomForcedMissionId = '';
   let heartbeatTimer = null;
 
   async function sendHeartbeat(status='online'){
@@ -620,6 +679,12 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     earthHits.length = 0;
     timeLeft = getLevelCfg().duration || 60;
     resetMissionAndEvents({ keepExisting });
+    if (classroomMode && classroomForcedMissionId) {
+      applyForcedMissionById(classroomForcedMissionId, 'teacher');
+    }
+    if (classroomMode && classroomForcedEventId) {
+      applyForcedEventById(classroomForcedEventId, 'teacher');
+    }
     setTime();
     draw();
   }
@@ -696,6 +761,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
         classroomLastRoundId = 0;
         classroomRoundFinished = false;
         classroomRoundStarted = false;
+        classroomLastEventNonce = 0;
+        classroomLastMissionNonce = 0;
+        classroomForcedEventId = '';
+        classroomForcedMissionId = '';
         hideClassroomOverlay();
         setModeChip('模式：自由練習', false);
         updatePauseButton();
@@ -710,6 +779,23 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       classroomMode = true;
       classroomCurrentClass = s.classPrefix || myClass;
       setModeChip(`模式：${classroomCurrentClass} 班級競賽`, true);
+
+      const eventNonce = Number(s.forcedEventNonce || 0);
+      const missionNonce = Number(s.forcedMissionNonce || 0);
+      if (eventNonce !== classroomLastEventNonce) {
+        classroomLastEventNonce = eventNonce;
+        classroomForcedEventId = String(s.forcedEventId || '');
+        if (running && classroomForcedEventId) applyForcedEventById(classroomForcedEventId, 'teacher');
+      } else if (typeof s.forcedEventId !== 'undefined') {
+        classroomForcedEventId = String(s.forcedEventId || '');
+      }
+      if (missionNonce !== classroomLastMissionNonce) {
+        classroomLastMissionNonce = missionNonce;
+        classroomForcedMissionId = String(s.forcedMissionId || '');
+        if (running && classroomForcedMissionId) applyForcedMissionById(classroomForcedMissionId, 'teacher');
+      } else if (typeof s.forcedMissionId !== 'undefined') {
+        classroomForcedMissionId = String(s.forcedMissionId || '');
+      }
 
       const serverNow = Number(s.now || Date.now());
       const roundId = Number(s.roundId || 0);

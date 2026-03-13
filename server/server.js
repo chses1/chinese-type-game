@@ -73,7 +73,13 @@ async function initMongo() {
           roundId: 0,
           updatedAt: Date.now(),
           startAt: null,
-          countdownSec: 0
+          countdownSec: 0,
+          forcedEventId: "",
+          forcedEventNonce: 0,
+          forcedEventIssuedAt: null,
+          forcedMissionId: "",
+          forcedMissionNonce: 0,
+          forcedMissionIssuedAt: null
         }
       },
       { upsert: true }
@@ -227,7 +233,13 @@ const classroomState = {
   roundId: 0,
   updatedAt: Date.now(),
   startAt: null,
-  countdownSec: 0
+  countdownSec: 0,
+  forcedEventId: "",
+  forcedEventNonce: 0,
+  forcedEventIssuedAt: null,
+  forcedMissionId: "",
+  forcedMissionNonce: 0,
+  forcedMissionIssuedAt: null
 };
 
 async function readClassroomState() {
@@ -341,6 +353,9 @@ app.post("/api/admin/clear-all", adminAuth, async (req, res) => {
   }
 });
 
+const ALLOWED_CLASSROOM_EVENTS = new Set(["meteorShower", "iceWind", "goldRush", "bossWave"]);
+const ALLOWED_CLASSROOM_MISSIONS = new Set(["goldHunter", "iceBreaker", "comboMaster", "quickShot", "bossBreaker", "random"]);
+
 // ====== 教室競賽控制 API ======
 app.post("/api/admin/classroom/open", adminAuth, async (req, res) => {
   const classPrefix = String(req.body?.classPrefix || "").trim();
@@ -352,7 +367,13 @@ app.post("/api/admin/classroom/open", adminAuth, async (req, res) => {
     classPrefix,
     status: "idle",
     startAt: null,
-    countdownSec: 0
+    countdownSec: 0,
+    forcedEventId: "",
+    forcedEventNonce: 0,
+    forcedEventIssuedAt: null,
+    forcedMissionId: "",
+    forcedMissionNonce: 0,
+    forcedMissionIssuedAt: null
   });
   console.log(`[classroom] open class=${classPrefix}`);
   res.json({ ok:true, data: { ...state } });
@@ -418,13 +439,55 @@ app.post("/api/admin/classroom/restart", adminAuth, async (req, res) => {
   res.json({ ok:true, data: { ...state } });
 });
 
+app.post("/api/admin/classroom/trigger-event", adminAuth, async (req, res) => {
+  await readClassroomState();
+  if (!classroomState.enabled || !/^\d{3}$/.test(classroomState.classPrefix)) {
+    return res.status(400).json({ ok:false, error:"classroom_not_open" });
+  }
+  const eventId = String(req.body?.eventId || "").trim();
+  if (!ALLOWED_CLASSROOM_EVENTS.has(eventId)) {
+    return res.status(400).json({ ok:false, error:"event_invalid", got: eventId });
+  }
+  const state = await writeClassroomState({
+    forcedEventId: eventId,
+    forcedEventNonce: Number(classroomState.forcedEventNonce || 0) + 1,
+    forcedEventIssuedAt: Date.now()
+  });
+  console.log(`[classroom] trigger-event class=${state.classPrefix} event=${eventId} nonce=${state.forcedEventNonce}`);
+  res.json({ ok:true, data: { ...state } });
+});
+
+app.post("/api/admin/classroom/assign-mission", adminAuth, async (req, res) => {
+  await readClassroomState();
+  if (!classroomState.enabled || !/^\d{3}$/.test(classroomState.classPrefix)) {
+    return res.status(400).json({ ok:false, error:"classroom_not_open" });
+  }
+  const missionId = String(req.body?.missionId || "").trim();
+  if (!ALLOWED_CLASSROOM_MISSIONS.has(missionId)) {
+    return res.status(400).json({ ok:false, error:"mission_invalid", got: missionId });
+  }
+  const state = await writeClassroomState({
+    forcedMissionId: missionId,
+    forcedMissionNonce: Number(classroomState.forcedMissionNonce || 0) + 1,
+    forcedMissionIssuedAt: Date.now()
+  });
+  console.log(`[classroom] assign-mission class=${state.classPrefix} mission=${missionId} nonce=${state.forcedMissionNonce}`);
+  res.json({ ok:true, data: { ...state } });
+});
+
 app.post("/api/admin/classroom/close", adminAuth, async (_req, res) => {
   const state = await writeClassroomState({
     enabled: false,
     classPrefix: "",
     status: "idle",
     startAt: null,
-    countdownSec: 0
+    countdownSec: 0,
+    forcedEventId: "",
+    forcedEventNonce: 0,
+    forcedEventIssuedAt: null,
+    forcedMissionId: "",
+    forcedMissionNonce: 0,
+    forcedMissionIssuedAt: null
   });
   console.log(`[classroom] close`);
   res.json({ ok:true, data: { ...state } });

@@ -1,152 +1,105 @@
-// teacher.js — 修正版（補齊 API.leaderboard / API.getClasses、統一 token key）
 
 const API_BASE = "/api";
 const $ = id => document.getElementById(id);
-const toast = msg => { const t=$('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1200); };
-
-// ✅ 統一 localStorage key（全檔一致用同一把）
 const TOKEN_KEY = 'teacher-session-token';
+const ACTION_COOLDOWN_MS = 8000;
+
+const state = {
+  classroom: null,
+  classes: [],
+  onlineRows: [],
+  liveRows: [],
+  pollTimer: null,
+  eventCooldownUntil: 0,
+  missionCooldownUntil: 0,
+};
+
+const toast = msg => {
+  const t = $('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove('show'), 1400);
+};
+
 function getToken(){ return localStorage.getItem(TOKEN_KEY) || ''; }
 function setToken(v){ if (v) localStorage.setItem(TOKEN_KEY, v); else localStorage.removeItem(TOKEN_KEY); }
+function showLock(){ if ($('lock')) $('lock').style.display = 'flex'; if ($('app')) $('app').style.display = 'none'; }
+function hideLock(){ if ($('lock')) $('lock').style.display = 'none'; if ($('app')) $('app').style.display = ''; }
 
-function showLock(){ const lock=$('lock'), app=$('app'); if(lock&&app){ lock.style.display='flex'; app.style.display='none'; } }
-function hideLock(){ const lock=$('lock'), app=$('app'); if(lock&&app){ lock.style.display='none'; app.style.display=''; } }
-
-// 共用 fetch（會把 4xx/5xx 的訊息吐出來）
 async function jsonFetch(url, opts = {}) {
   const res = await fetch(url, {
     cache: 'no-store',
     ...opts,
-    headers: { 'Content-Type':'application/json', ...(opts.headers||{}) },
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
   });
   if (!res.ok) {
-    let msg = ''; try { msg = await res.text(); } catch {}
-    if (res.status === 401) { localStorage.removeItem(TOKEN_KEY); showLock && showLock(); }
+    let msg = '';
+    try { msg = await res.text(); } catch {}
+    if (res.status === 401) {
+      setToken('');
+      showLock();
+    }
     throw new Error(`${res.status} ${res.statusText}${msg ? ' - ' + msg : ''}`);
   }
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.text();
 }
 
-// ✅ 補齊缺少的 API 函式
-const authHeaders = (token) => token ? { 'x-admin-session': token } : {};
-
+const authHeaders = token => token ? { 'x-admin-session': token } : {};
 const API = {
-  adminLogin(password){
-    return jsonFetch(`${API_BASE}/admin/login`, {
-      method:'POST',
-      body: JSON.stringify({ password })
-    });
-  },
-  adminLogout(token){
-    return jsonFetch(`${API_BASE}/admin/logout`, {
-      method:'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({})
-    });
-  },
-  // 排行榜：?limit=10&classPrefix=301（classPrefix 可省略）
-  leaderboard(limit = 10, classPrefix = "") {
+  adminLogin(password){ return jsonFetch(`${API_BASE}/admin/login`, { method:'POST', body: JSON.stringify({ password }) }); },
+  getClasses(){ return jsonFetch(`${API_BASE}/classes`); },
+  leaderboard(limit = 10, classPrefix = '') {
     const qs = new URLSearchParams({ limit });
     if (classPrefix) qs.set('classPrefix', classPrefix);
-    return jsonFetch(`${API_BASE}/leaderboard?` + qs.toString());
+    return jsonFetch(`${API_BASE}/leaderboard?${qs.toString()}`);
   },
-  // 班級統計列表
-  getClasses() {
-    return jsonFetch(`${API_BASE}/classes`);
-  },
-  // 管理清除
-  adminClearClass(classPrefix, token){
-    return jsonFetch(`${API_BASE}/admin/clear-class`, {
-      method:'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ classPrefix, mode:'delete' })
-    });
-  },
-  adminClearAll(token){
-    return jsonFetch(`${API_BASE}/admin/clear-all`, {
-      method:'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ mode:'delete' })
-    });
-  },
-  classroomState(){
-    return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`);
-  },
+  classroomState(){ return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`); },
   onlineStudents(classPrefix, token){
     const qs = new URLSearchParams();
     if (classPrefix) qs.set('classPrefix', classPrefix);
-    return jsonFetch(`${API_BASE}/admin/online-students?` + qs.toString(), { headers: authHeaders(token) });
+    return jsonFetch(`${API_BASE}/admin/online-students?${qs.toString()}`, { headers: authHeaders(token) });
   },
   liveLeaderboard(classPrefix, limit, token){
     const qs = new URLSearchParams();
     if (classPrefix) qs.set('classPrefix', classPrefix);
     if (limit) qs.set('limit', limit);
-    return jsonFetch(`${API_BASE}/admin/live-leaderboard?` + qs.toString(), { headers: authHeaders(token) });
+    return jsonFetch(`${API_BASE}/admin/live-leaderboard?${qs.toString()}`, { headers: authHeaders(token) });
+  },
+  adminClearClass(classPrefix, token){
+    return jsonFetch(`${API_BASE}/admin/clear-class`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ classPrefix, mode:'delete' }) });
+  },
+  adminClearAll(token){
+    return jsonFetch(`${API_BASE}/admin/clear-all`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ mode:'delete' }) });
   },
   classroomOpen(classPrefix, token){
-    return jsonFetch(`${API_BASE}/admin/classroom/open`, {
-      method:'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ classPrefix })
-    });
+    return jsonFetch(`${API_BASE}/admin/classroom/open`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ classPrefix }) });
   },
   classroomStart(classPrefix, countdownSec, token){
-    return jsonFetch(`${API_BASE}/admin/classroom/start`, {
-      method:'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ classPrefix, countdownSec })
-    });
+    return jsonFetch(`${API_BASE}/admin/classroom/start`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ classPrefix, countdownSec }) });
   },
   classroomPause(token){
-    return jsonFetch(`${API_BASE}/admin/classroom/pause`, {
-      method:'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({})
-    });
+    return jsonFetch(`${API_BASE}/admin/classroom/pause`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({}) });
   },
   classroomRestart(countdownSec, token){
-    return jsonFetch(`${API_BASE}/admin/classroom/restart`, {
-      method:'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({ countdownSec })
-    });
+    return jsonFetch(`${API_BASE}/admin/classroom/restart`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ countdownSec }) });
   },
   classroomClose(token){
-    return jsonFetch(`${API_BASE}/admin/classroom/close`, {
-      method:'POST',
-      headers: authHeaders(token),
-      body: JSON.stringify({})
-    });
+    return jsonFetch(`${API_BASE}/admin/classroom/close`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({}) });
+  },
+  classroomTriggerEvent(eventId, token){
+    return jsonFetch(`${API_BASE}/admin/classroom/trigger-event`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ eventId }) });
+  },
+  classroomAssignMission(missionId, token){
+    return jsonFetch(`${API_BASE}/admin/classroom/assign-mission`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ missionId }) });
   },
 };
 
-
-let classroomTimer = null;
-let lastClassRankHtml = "";
-let lastOnlineHtml = "";
-let lastLiveHtml = "";
-
-function syncCcClassPrefix(v){
-  if ($('ccClassPrefix')) $('ccClassPrefix').value = v || '';
-}
-
-function renderClassroomState(s){
-  const box = $('ccState');
-  if (!box) return;
-  if (!s?.enabled) { box.textContent = '未開啟'; return; }
-  let text = `班級 ${s.classPrefix}｜`;
-  if (s.status === 'countdown') {
-    const sec = Math.max(0, Math.ceil(((s.startAt || 0) - (s.now || Date.now())) / 1000));
-    text += `倒數中 ${sec} 秒`;
-  } else if (s.status === 'running') {
-    text += '進行中';
-  } else if (s.status === 'paused') {
-    text += '已暫停';
-  } else {
-    text += '等待開始';
-  }
-  box.textContent = text;
+function switchTab(name){
+  document.querySelectorAll('.tabBtn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
+  document.querySelectorAll('.tabPanel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
 }
 
 function formatAgo(ts){
@@ -158,218 +111,303 @@ function formatAgo(ts){
   return `${Math.floor(diff / 60)} 分前`;
 }
 
-function renderBodyIfChanged(id, html, emptyColspan, emptyText){
-  const el = $(id);
+function syncClassInputs(v){
+  const value = (v || '').trim();
+  if ($('classPrefix')) $('classPrefix').value = value;
+  if ($('ccClassPrefix')) $('ccClassPrefix').value = value;
+}
+
+function getSelectedClassPrefix(){
+  const cc = ($('ccClassPrefix')?.value || '').trim();
+  const cp = ($('classPrefix')?.value || '').trim();
+  return /^\d{3}$/.test(cc) ? cc : (/^\d{3}$/.test(cp) ? cp : '');
+}
+
+function renderStateBadge(classroom){
+  const el = $('ccStateBadge');
   if (!el) return;
-  const safeHtml = html || `<tr><td colspan="${emptyColspan}">${emptyText}</td></tr>`;
-  if (id === 'teacherLbBody') {
-    if (safeHtml === lastClassRankHtml) return;
-    lastClassRankHtml = safeHtml;
-  } else if (id === 'onlineStudentsBody') {
-    if (safeHtml === lastOnlineHtml) return;
-    lastOnlineHtml = safeHtml;
-  } else if (id === 'liveRankBody') {
-    if (safeHtml === lastLiveHtml) return;
-    lastLiveHtml = safeHtml;
+  if (!classroom?.enabled) {
+    el.className = 'stateBadge idle';
+    el.textContent = '未開啟';
+    return;
   }
-  el.innerHTML = safeHtml;
+  const status = String(classroom.status || 'idle');
+  const now = Number(classroom.now || Date.now());
+  let text = `班級 ${classroom.classPrefix || '—'}｜`;
+  if (status === 'countdown') {
+    const sec = Math.max(0, Math.ceil(((classroom.startAt || 0) - now) / 1000));
+    text += `倒數中 ${sec} 秒`;
+  } else if (status === 'running') {
+    text += '進行中';
+  } else if (status === 'paused') {
+    text += '已暫停';
+  } else {
+    text += '等待開始';
+  }
+  el.className = `stateBadge ${status}`;
+  el.textContent = text;
 }
 
-async function loadOnlineStudents(){
-  const token = getToken();
-  if (!token) return;
-  const p = ($('ccClassPrefix')?.value || $('classPrefix')?.value || '').trim();
-  try {
-    const resp = await API.onlineStudents(/^\d{3}$/.test(p) ? p : '', token);
-    const html = (resp.data || []).map((r, i) => `
-      <tr>
-        <td>${i+1}</td>
-        <td>${r.sid}</td>
-        <td>${Number(r.currentScore || 0)}</td>
-        <td>${r.onlineStatus || 'online'}</td>
-        <td>${formatAgo(r.lastSeenAt)}</td>
-      </tr>`).join('');
-    renderBodyIfChanged('onlineStudentsBody', html, 5, '目前沒有學生在線');
-  } catch (e) {
-    renderBodyIfChanged('onlineStudentsBody', `<tr><td colspan="5">讀取失敗：${e.message}</td></tr>`, 5, '');
+function humanEventName(id){
+  return ({ meteorShower:'☄️ 流星雨', iceWind:'🧊 冰風暴', goldRush:'✨ 黃金時刻', bossWave:'👾 Boss 波次' }[id] || '目前無事件');
+}
+function humanMissionName(id){
+  return ({ goldHunter:'✨ 黃金獵人', iceBreaker:'❄️ 冰凍專家', comboMaster:'🔥 連擊高手', quickShot:'⚡ 快速反應', bossBreaker:'👾 Boss 剋星' }[id] || '目前無指定任務');
+}
+
+function renderHud(){
+  const c = state.classroom || {};
+  $('hudClass').textContent = c.enabled ? (c.classPrefix || '—') : '—';
+  $('hudStatus').textContent = !c.enabled ? '未開啟' : ({ idle:'等待開始', countdown:'倒數中', running:'進行中', paused:'已暫停' }[c.status] || c.status || '未開啟');
+  $('hudOnline').textContent = String(state.onlineRows.length || 0);
+  $('hudLeader').textContent = state.liveRows.length ? `${state.liveRows[0].sid}｜${Number(state.liveRows[0].currentScore || 0)} 分` : '—';
+  renderStateBadge(c);
+
+  const eventName = c?.forcedEventId ? humanEventName(c.forcedEventId) : '目前無事件';
+  const missionName = c?.forcedMissionId ? humanMissionName(c.forcedMissionId) : '目前無指定任務';
+  $('activeEventText').textContent = eventName;
+  $('activeMissionText').textContent = missionName;
+
+  let hint = '老師可在「競賽控制」頁籤派送事件卡或任務卡，改變班級競賽節奏。';
+  if (c?.forcedEventIssuedAt || c?.forcedMissionIssuedAt) {
+    const parts = [];
+    if (c.forcedEventIssuedAt) parts.push(`事件更新於 ${formatAgo(c.forcedEventIssuedAt)}`);
+    if (c.forcedMissionIssuedAt) parts.push(`任務更新於 ${formatAgo(c.forcedMissionIssuedAt)}`);
+    hint = parts.join('｜');
+  }
+  $('directiveHint').textContent = hint;
+}
+
+function renderRankRows(rows){
+  const body = $('liveRankBody');
+  if (!body) return;
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="5">目前沒有即時競賽資料</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((r, i) => `
+    <tr class="${i===0?'top1':i===1?'top2':i===2?'top3':''}">
+      <td>${i+1}</td>
+      <td>${r.sid}</td>
+      <td>${Number(r.currentScore || 0)}</td>
+      <td>${Number(r.best || 0)}</td>
+      <td>${r.onlineStatus || 'online'}</td>
+    </tr>`).join('');
+}
+
+function renderOnlineRows(rows){
+  const body = $('onlineStudentsBody');
+  if (!body) return;
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="5">目前沒有學生在線</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${r.sid}</td>
+      <td>${Number(r.currentScore || 0)}</td>
+      <td>${r.onlineStatus || 'online'}</td>
+      <td>${formatAgo(r.lastSeenAt)}</td>
+    </tr>`).join('');
+}
+
+function renderClassRankRows(rows){
+  const body = $('teacherLbBody');
+  if (!body) return;
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="3">目前沒有排行榜資料</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((r, i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td>${r.sid}</td>
+      <td>${Number(r.best || 0)}</td>
+    </tr>`).join('');
+}
+
+function renderClassChips(classes = []){
+  const box = $('classList');
+  const toggle = $('btnToggleClasses');
+  if (!box) return;
+  box.innerHTML = '';
+  state.classes = classes;
+  classes.forEach((c, index) => {
+    const btn = document.createElement('button');
+    btn.className = 'tag' + (index >= 8 ? ' extraChip' : '');
+    btn.textContent = `${c.class}｜${c.count}人｜Top ${c.top}`;
+    btn.onclick = () => {
+      syncClassInputs(c.class);
+      loadClassRank();
+      toast(`已選取 ${c.class} 班`);
+    };
+    box.appendChild(btn);
+  });
+  const needToggle = classes.length > 8;
+  if (toggle) {
+    toggle.style.display = needToggle ? 'inline-flex' : 'none';
+    toggle.textContent = box.classList.contains('collapsed') ? '展開全部班級' : '收合班級清單';
   }
 }
 
-async function loadLiveLeaderboard(){
-  const token = getToken();
-  if (!token) return;
-  const p = ($('ccClassPrefix')?.value || $('classPrefix')?.value || '').trim();
-  const limit = Number(($('lbLimit')?.value) || 20);
-  try {
-    const resp = await API.liveLeaderboard(/^\d{3}$/.test(p) ? p : '', limit, token);
-    const html = (resp.data || []).map((r, i) => `
-      <tr>
-        <td>${i+1}</td>
-        <td>${r.sid}</td>
-        <td>${Number(r.currentScore || 0)}</td>
-        <td>${Number(r.best || 0)}</td>
-        <td>${r.onlineStatus || 'online'}</td>
-      </tr>`).join('');
-    renderBodyIfChanged('liveRankBody', html, 5, '目前沒有即時競賽資料');
-  } catch (e) {
-    renderBodyIfChanged('liveRankBody', `<tr><td colspan="5">讀取失敗：${e.message}</td></tr>`, 5, '');
-  }
+function updateCooldownButtons(){
+  const now = Date.now();
+  const eventRemain = Math.max(0, state.eventCooldownUntil - now);
+  const missionRemain = Math.max(0, state.missionCooldownUntil - now);
+  document.querySelectorAll('.eventBtn').forEach(btn => {
+    const disabled = eventRemain > 0;
+    btn.classList.toggle('cooling', disabled);
+    btn.disabled = disabled;
+    const label = btn.dataset.originalLabel || btn.querySelector('span')?.textContent || btn.textContent;
+    if (!btn.dataset.originalLabel) btn.dataset.originalLabel = label;
+    if (btn.querySelector('span')) btn.querySelector('span').textContent = disabled ? `${label}（${Math.ceil(eventRemain / 1000)}秒）` : label;
+  });
+  document.querySelectorAll('.missionBtn').forEach(btn => {
+    const disabled = missionRemain > 0;
+    btn.classList.toggle('cooling', disabled);
+    btn.disabled = disabled;
+    const label = btn.dataset.originalLabel || btn.querySelector('span')?.textContent || btn.textContent;
+    if (!btn.dataset.originalLabel) btn.dataset.originalLabel = label;
+    if (btn.querySelector('span')) btn.querySelector('span').textContent = disabled ? `${label}（${Math.ceil(missionRemain / 1000)}秒）` : label;
+  });
 }
+setInterval(updateCooldownButtons, 500);
 
-async function refreshClassroomState(){
-  try {
-    const resp = await API.classroomState();
-    const s = resp.data;
-    renderClassroomState(s);
-    if (s?.enabled && /^\d{3}$/.test(s.classPrefix)) {
-      if ($('classPrefix')) $('classPrefix').value = s.classPrefix;
-      syncCcClassPrefix(s.classPrefix);
-    }
-    await loadOnlineStudents();
-    await loadLiveLeaderboard();
-  } catch (e) {
-    console.warn('classroom state fail', e);
-  }
-}
-
-function startClassroomPolling(){
-  clearInterval(classroomTimer);
-  classroomTimer = setInterval(refreshClassroomState, 2000);
-  refreshClassroomState();
-}
-
-async function ccOpen(){
-  const token = getToken();
-  const p = ($('ccClassPrefix')?.value || $('classPrefix')?.value || '').trim();
-  if (!token) return alert('請先輸入教師密碼');
-  if (!/^\d{3}$/.test(p)) return alert('請輸入班級前三碼');
-  await API.classroomOpen(p, token);
-  if ($('classPrefix')) $('classPrefix').value = p;
-  syncCcClassPrefix(p);
-  toast(`已開啟 ${p} 班競賽`);
-  await refreshClassroomState();
-}
-
-async function ccStart(){
-  const token = getToken();
-  const p = ($('ccClassPrefix')?.value || $('classPrefix')?.value || '').trim();
-  const countdownSec = Number(($('ccCountdown')?.value) || 3);
-  if (!token) return alert('請先輸入教師密碼');
-  if (!/^\d{3}$/.test(p)) return alert('請輸入班級前三碼');
-  await API.classroomStart(p, countdownSec, token);
-  if ($('classPrefix')) $('classPrefix').value = p;
-  syncCcClassPrefix(p);
-  toast('全班開始倒數');
-  await refreshClassroomState();
-}
-
-async function ccPause(){
-  const token = getToken();
-  if (!token) return alert('請先輸入教師密碼');
-  await API.classroomPause(token);
-  toast('已全班暫停');
-  await refreshClassroomState();
-}
-
-async function ccRestart(){
-  const token = getToken();
-  const countdownSec = Number(($('ccCountdown')?.value) || 3);
-  if (!token) return alert('請先輸入教師密碼');
-  if (!confirm('確定要讓全班重新開始嗎？目前分數會從 0 重新計算。')) return;
-  await API.classroomRestart(countdownSec, token);
-  toast('全班重新倒數');
-  await refreshClassroomState();
-}
-
-async function ccClose(){
-  const token = getToken();
-  if (!token) return alert('請先輸入教師密碼');
-  if (!confirm('確定要結束班級競賽嗎？學生會回到自由練習模式。')) return;
-  await API.classroomClose(token);
-  toast('已結束競賽');
-  await refreshClassroomState();
-}
-
-// ====== UI 動作 ======
 async function loadClasses(){
-  try{
-    const resp = await API.getClasses();
-    const box = $('classList'); if (!box) return;
-    box.innerHTML = "";
-    resp.data.forEach(c=>{
-      const btn=document.createElement('button');
-      btn.className='tag';
-      btn.textContent=`${c.class}（${c.count}人，Top ${c.top}，Avg ${c.avg}）`;
-      btn.onclick=()=>{ $('classPrefix').value=c.class; $('classPrefix').dispatchEvent(new Event('input',{bubbles:true})); loadClassRank(); };
-      box.appendChild(btn);
-    });
-  }catch(e){ toast('載入班級清單失敗'); console.warn(e); }
-}
-
-async function loadAllRank(){
-  const limit = Number(($('lbLimit')?.value) || 20);
-  const tb = $('teacherLbBody'); if (!tb) return;
-  try {
-    const resp = await API.leaderboard(limit);
-    const html = resp.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
-    renderBodyIfChanged('teacherLbBody', html, 3, '尚無資料');
-  } catch (e) {
-    renderBodyIfChanged('teacherLbBody', `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`, 3, '');
-  }
+  const resp = await API.getClasses();
+  renderClassChips(resp.data || []);
 }
 
 async function loadClassRank(){
-  const p = ($('classPrefix')?.value || '').trim();
-  if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼（三碼，允許 0 開頭）'); return; }
-  const limit = Number(($('lbLimit')?.value) || 20);
-  const tb = $('teacherLbBody'); if (!tb) return;
-  try {
-    const resp = await API.leaderboard(limit, p);
-    const html = resp.data.map((r,i)=>`<tr><td>${i+1}</td><td>${r.sid}</td><td>${r.best}</td></tr>`).join('');
-    renderBodyIfChanged('teacherLbBody', html, 3, '尚無資料');
-  } catch (e) {
-    renderBodyIfChanged('teacherLbBody', `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`, 3, '');
-  }
+  const prefix = ($('classPrefix')?.value || '').trim();
+  if (!/^\d{3}$/.test(prefix)) return alert('請輸入正確的班級前三碼');
+  const limit = Number(($('lbLimit')?.value) || 10);
+  const resp = await API.leaderboard(limit, prefix);
+  renderClassRankRows(resp.data || []);
 }
 
-// 清除（單班 / 全部）
-async function clearClass(){
-  const p = ($('classPrefix')?.value || '').trim();
-  const token = getToken();
-  if(!token){ showLock(); alert('請先輸入教師密碼。'); return; }
-  if(!/^\d{3}$/.test(p)){ alert('請輸入班級前三碼（三碼，允許 0 開頭）'); return; }
-  if(!confirm(`確認要清除 ${p} 班全部學生紀錄（含學號）？`)) return;
-  try { await API.adminClearClass(p, token); toast(`已清除 ${p} 班`); await loadClassRank(); }
-  catch(e){ if(String(e.message).startsWith('401')) alert('教師密碼錯誤或已過期，請重新輸入。'); else alert('清除失敗：'+e.message); }
+async function loadAllRank(){
+  const limit = Number(($('lbLimit')?.value) || 10);
+  const resp = await API.leaderboard(limit);
+  renderClassRankRows(resp.data || []);
 }
+
+async function loadAdminRealtime(){
+  const token = getToken();
+  if (!token) return;
+  const prefix = getSelectedClassPrefix();
+  const limit = Number(($('lbLimit')?.value) || 10);
+  const [onlineResp, liveResp] = await Promise.all([
+    API.onlineStudents(prefix, token),
+    API.liveLeaderboard(prefix, limit, token),
+  ]);
+  state.onlineRows = onlineResp.data || [];
+  state.liveRows = liveResp.data || [];
+  renderOnlineRows(state.onlineRows);
+  renderRankRows(state.liveRows);
+}
+
+async function refreshAll(){
+  const [classroomResp, classesResp] = await Promise.all([
+    API.classroomState(),
+    API.getClasses(),
+  ]);
+  state.classroom = classroomResp.data || null;
+  if (state.classroom?.enabled && /^\d{3}$/.test(state.classroom.classPrefix || '')) syncClassInputs(state.classroom.classPrefix);
+  renderClassChips(classesResp.data || []);
+  await loadAdminRealtime();
+  renderHud();
+}
+
+function ensureTeacherReady(){
+  const token = getToken();
+  if (!token) throw new Error('請先輸入教師密碼');
+  const prefix = getSelectedClassPrefix();
+  if (!/^\d{3}$/.test(prefix)) throw new Error('請先輸入班級前三碼');
+  return { token, prefix };
+}
+
+async function onOpen(){ const { token, prefix } = ensureTeacherReady(); await API.classroomOpen(prefix, token); toast(`已開啟 ${prefix} 班競賽`); await refreshAll(); }
+async function onStart(){ const { token, prefix } = ensureTeacherReady(); const sec = Number(($('ccCountdown')?.value) || 3); await API.classroomStart(prefix, sec, token); toast('全班開始倒數'); await refreshAll(); }
+async function onPause(){ const token = getToken(); if (!token) throw new Error('請先輸入教師密碼'); await API.classroomPause(token); toast('已全班暫停'); await refreshAll(); }
+async function onRestart(){ const token = getToken(); if (!token) throw new Error('請先輸入教師密碼'); if (!confirm('確定讓全班重新開始嗎？目前分數會從 0 重新計算。')) return; const sec = Number(($('ccCountdown')?.value) || 3); await API.classroomRestart(sec, token); toast('全班重新倒數'); await refreshAll(); }
+async function onClose(){ const token = getToken(); if (!token) throw new Error('請先輸入教師密碼'); if (!confirm('確定結束班級競賽嗎？學生會回到自由練習模式。')) return; await API.classroomClose(token); toast('已結束競賽'); await refreshAll(); }
+
+async function onTriggerEvent(eventId){
+  const token = getToken();
+  if (!token) throw new Error('請先輸入教師密碼');
+  if (!(state.classroom?.enabled)) throw new Error('請先開啟班級競賽');
+  await API.classroomTriggerEvent(eventId, token);
+  state.eventCooldownUntil = Date.now() + ACTION_COOLDOWN_MS;
+  updateCooldownButtons();
+  toast(`已派送 ${humanEventName(eventId)}`);
+  await refreshAll();
+}
+
+async function onAssignMission(missionId){
+  const token = getToken();
+  if (!token) throw new Error('請先輸入教師密碼');
+  if (!(state.classroom?.enabled)) throw new Error('請先開啟班級競賽');
+  await API.classroomAssignMission(missionId, token);
+  state.missionCooldownUntil = Date.now() + ACTION_COOLDOWN_MS;
+  updateCooldownButtons();
+  toast(`已派送 ${missionId === 'random' ? '🎲 隨機任務' : humanMissionName(missionId)}`);
+  await refreshAll();
+}
+
+async function clearClass(){
+  const token = getToken();
+  const prefix = ($('classPrefix')?.value || '').trim();
+  if (!token) return alert('請先輸入教師密碼');
+  if (!/^\d{3}$/.test(prefix)) return alert('請先輸入班級前三碼');
+  if (!confirm(`確認清除 ${prefix} 班全部紀錄（含學號）？`)) return;
+  await API.adminClearClass(prefix, token);
+  toast(`已清除 ${prefix} 班資料`);
+  await refreshAll();
+  await loadClassRank();
+}
+
 async function clearAll(){
   const token = getToken();
-  if(!token){ showLock(); alert('請先輸入教師密碼。'); return; }
-  if(!confirm('確認要「清除全部學生紀錄（含學號）」嗎？')) return;
-  try { await API.adminClearAll(token); toast('已清除全部學生紀錄'); await loadAllRank(); }
-  catch(e){ if(String(e.message).startsWith('401')) alert('教師密碼錯誤或已過期，請重新輸入。'); else alert('清除失敗：'+e.message); }
+  if (!token) return alert('請先輸入教師密碼');
+  if (!confirm('確認清除全部學生紀錄（含學號）？')) return;
+  await API.adminClearAll(token);
+  toast('已清除全部學生紀錄');
+  await refreshAll();
+  renderClassRankRows([]);
 }
 
-// 綁定
-$('btnLoadClasses')  && ($('btnLoadClasses').onclick = loadClasses);
-$('btnShowAll')      && ($('btnShowAll').onclick     = loadAllRank);
-$('btnLoadClassRank')&& ($('btnLoadClassRank').onclick= loadClassRank);
-$('btnClearClass')   && ($('btnClearClass').onclick  = clearClass);
-$('btnClearAll')     && ($('btnClearAll').onclick    = clearAll);
-$('btnCcOpen')       && ($('btnCcOpen').onclick      = ()=>ccOpen().catch(e=>alert('開啟班級競賽失敗：'+e.message)));
-$('btnCcStart')      && ($('btnCcStart').onclick     = ()=>ccStart().catch(e=>alert('全班開始失敗：'+e.message)));
-$('btnCcPause')      && ($('btnCcPause').onclick     = ()=>ccPause().catch(e=>alert('全班暫停失敗：'+e.message)));
-$('btnCcRestart')    && ($('btnCcRestart').onclick   = ()=>ccRestart().catch(e=>alert('全班重來失敗：'+e.message)));
-$('btnCcClose')      && ($('btnCcClose').onclick     = ()=>ccClose().catch(e=>alert('結束競賽失敗：'+e.message)));
+function startPolling(){
+  clearInterval(state.pollTimer);
+  state.pollTimer = setInterval(() => refreshAll().catch(err => console.warn(err)), 2000);
+}
 
-// 🔒 鎖定流程
-(async function init(){
-  const ipt = $('classPrefix'), btn = $('btnClearClass');
-  const toggle = () => { if(btn && ipt) btn.disabled = !/^\d{3}$/.test((ipt.value||'').trim()); };
-  ipt && ipt.addEventListener('input', toggle);
-  toggle();
+function bindEvents(){
+  document.querySelectorAll('.tabBtn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+  $('btnRefreshOverview')?.addEventListener('click', () => refreshAll().then(() => toast('已重新整理')).catch(err => alert(err.message)));
+  $('btnLoadClasses')?.addEventListener('click', () => loadClasses().then(() => toast('已載入班級清單')).catch(err => alert(err.message)));
+  $('btnShowAll')?.addEventListener('click', () => loadAllRank().catch(err => alert(err.message)));
+  $('btnLoadClassRank')?.addEventListener('click', () => loadClassRank().catch(err => alert(err.message)));
+  $('btnClearClass')?.addEventListener('click', () => clearClass().catch(err => alert(err.message)));
+  $('btnClearAll')?.addEventListener('click', () => clearAll().catch(err => alert(err.message)));
+  $('btnCcOpen')?.addEventListener('click', () => onOpen().catch(err => alert(err.message)));
+  $('btnCcStart')?.addEventListener('click', () => onStart().catch(err => alert(err.message)));
+  $('btnCcPause')?.addEventListener('click', () => onPause().catch(err => alert(err.message)));
+  $('btnCcRestart')?.addEventListener('click', () => onRestart().catch(err => alert(err.message)));
+  $('btnCcClose')?.addEventListener('click', () => onClose().catch(err => alert(err.message)));
+  $('btnToggleClasses')?.addEventListener('click', () => {
+    const box = $('classList');
+    if (!box) return;
+    box.classList.toggle('collapsed');
+    $('btnToggleClasses').textContent = box.classList.contains('collapsed') ? '展開全部班級' : '收合班級清單';
+  });
+  $('classPrefix')?.addEventListener('input', e => { const v = e.target.value.replace(/\D/g, '').slice(0,3); e.target.value = v; if ($('ccClassPrefix')) $('ccClassPrefix').value = v; });
+  $('ccClassPrefix')?.addEventListener('input', e => { const v = e.target.value.replace(/\D/g, '').slice(0,3); e.target.value = v; if ($('classPrefix')) $('classPrefix').value = v; });
+  document.querySelectorAll('.eventBtn').forEach(btn => btn.addEventListener('click', () => onTriggerEvent(btn.dataset.event).catch(err => alert(err.message))));
+  document.querySelectorAll('.missionBtn').forEach(btn => btn.addEventListener('click', () => onAssignMission(btn.dataset.mission).catch(err => alert(err.message))));
 
-  $('lockEnter') && ($('lockEnter').onclick = async () => {
+  $('lockEnter')?.addEventListener('click', async () => {
     const password = ($('lockPass')?.value || '').trim();
     if (!password) return alert('請輸入教師密碼');
     try {
@@ -377,36 +415,26 @@ $('btnCcClose')      && ($('btnCcClose').onclick     = ()=>ccClose().catch(e=>al
       setToken(resp?.data?.sessionToken || '');
       if ($('lockPass')) $('lockPass').value = '';
       hideLock();
-      loadClasses();
-      loadAllRank();
-      startClassroomPolling();
+      await refreshAll();
+      startPolling();
       toast('已解鎖');
-    } catch (e) {
+    } catch {
       alert('教師密碼錯誤或伺服器驗證失敗');
       showLock();
     }
   });
+}
 
-  if ($('classPrefix') && $('ccClassPrefix')) {
-    $('classPrefix').addEventListener('input', ()=> syncCcClassPrefix(($('classPrefix').value||'').trim()));
-    $('ccClassPrefix').addEventListener('input', ()=> {
-      if ($('classPrefix')) $('classPrefix').value = ($('ccClassPrefix').value||'').trim();
-    });
-  }
-
+(async function init(){
+  bindEvents();
   const token = getToken();
-  if (!token) {
-    showLock();
-    return;
-  }
-
+  if (!token) { showLock(); return; }
   try {
     await API.onlineStudents('', token);
     hideLock();
-    loadClasses();
-    loadAllRank();
-    startClassroomPolling();
-  } catch (e) {
+    await refreshAll();
+    startPolling();
+  } catch {
     setToken('');
     showLock();
   }
