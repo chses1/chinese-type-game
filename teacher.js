@@ -363,10 +363,11 @@ $('btnCcRestart')    && ($('btnCcRestart').onclick   = ()=>ccRestart().catch(e=>
 $('btnCcClose')      && ($('btnCcClose').onclick     = ()=>ccClose().catch(e=>alert('結束競賽失敗：'+e.message)));
 
 // 🔒 鎖定流程
-(function init(){
+(async function init(){
   const ipt = $('classPrefix'), btn = $('btnClearClass');
   const toggle = () => { if(btn && ipt) btn.disabled = !/^\d{3}$/.test((ipt.value||'').trim()); };
-  ipt && ipt.addEventListener('input', toggle); toggle();
+  ipt && ipt.addEventListener('input', toggle);
+  toggle();
 
   $('lockEnter') && ($('lockEnter').onclick = async () => {
     const password = ($('lockPass')?.value || '').trim();
@@ -382,13 +383,31 @@ $('btnCcClose')      && ($('btnCcClose').onclick     = ()=>ccClose().catch(e=>al
       toast('已解鎖');
     } catch (e) {
       alert('教師密碼錯誤或伺服器驗證失敗');
+      showLock();
     }
   });
 
-  // 開啟頁面：有 token 就直接載入，沒有就先鎖住
   if ($('classPrefix') && $('ccClassPrefix')) {
     $('classPrefix').addEventListener('input', ()=> syncCcClassPrefix(($('classPrefix').value||'').trim()));
-    $('ccClassPrefix').addEventListener('input', ()=> { if ($('classPrefix')) $('classPrefix').value = ($('ccClassPrefix').value||'').trim(); });
+    $('ccClassPrefix').addEventListener('input', ()=> {
+      if ($('classPrefix')) $('classPrefix').value = ($('ccClassPrefix').value||'').trim();
+    });
   }
-  if (getToken()) { hideLock(); loadClasses(); loadAllRank(); startClassroomPolling(); } else { showLock(); }
+
+  const token = getToken();
+  if (!token) {
+    showLock();
+    return;
+  }
+
+  try {
+    await API.onlineStudents('', token);
+    hideLock();
+    loadClasses();
+    loadAllRank();
+    startClassroomPolling();
+  } catch (e) {
+    setToken('');
+    showLock();
+  }
 })();
