@@ -2194,6 +2194,14 @@ async function endAndShowLeader(){
         } catch (e) {
           console.warn('final victory sequence fail', e);
         }
+
+        try {
+          if (me.sid) await submitBest(me.sid, score);
+          await setBest();
+        } catch (e) {
+          console.warn('final clear submit/setBest fail', e);
+        }
+
         await openLeader();
         return;
       }
