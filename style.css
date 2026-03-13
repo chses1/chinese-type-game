@@ -457,3 +457,93 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   #resultCard{ max-height:72dvh; }
   .resultStatsGrid{ grid-template-columns:repeat(4,minmax(0,1fr)); }
 }
+
+
+/* ===== 排行榜彈窗 ===== */
+#leader{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  background:rgba(0,0,0,.58);
+  z-index:60;
+}
+#leader.show{display:flex;}
+.leaderCard{
+  width:min(760px,94vw);
+  max-height:min(82dvh,680px);
+  padding:18px 18px 14px;
+  border-radius:22px;
+  background:linear-gradient(180deg, rgba(11,36,78,.97), rgba(8,28,62,.95));
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 22px 60px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.08);
+  overflow:hidden;
+}
+.leaderTitleRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+.leaderTitleRow h2{
+  margin:0;
+  color:#ffe16a;
+  font-size:clamp(24px,3vw,32px);
+}
+.leaderMeta{
+  font-size:13px;
+  color:rgba(238,245,255,.76);
+  text-align:right;
+}
+.leaderTableWrap{
+  max-height:min(56dvh,460px);
+  overflow:auto;
+  border-radius:16px;
+  background:rgba(4,14,32,.38);
+  border:1px solid rgba(255,255,255,.08);
+}
+.leaderTableWrap table{
+  width:100%;
+  border-collapse:collapse;
+}
+.leaderTableWrap thead th{
+  position:sticky;
+  top:0;
+  z-index:1;
+  background:rgba(8,22,48,.96);
+}
+.leaderTableWrap th,
+.leaderTableWrap td{
+  padding:12px 14px;
+  text-align:left;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.leaderTableWrap tbody tr.me{
+  background:rgba(255,213,74,.16);
+  box-shadow:inset 0 0 0 1px rgba(255,213,74,.28);
+}
+.leaderTableWrap tbody tr:nth-child(even):not(.me){
+  background:rgba(255,255,255,.03);
+}
+@media (max-width: 640px){
+  .leaderCard{
+    width:min(94vw,560px);
+    max-height:84dvh;
+    padding:14px 12px 12px;
+    border-radius:18px;
+  }
+  .leaderTitleRow{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+  .leaderMeta{
+    text-align:left;
+  }
+  .leaderTableWrap th,
+  .leaderTableWrap td{
+    padding:10px 10px;
+  }
+}

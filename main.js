@@ -1879,8 +1879,15 @@ async function endAndShowLeader(){
     const closeBtn = $('btnCloseLeader');
     if (closeBtn) closeBtn.textContent = '結束';
 
-    const tb = $('leaderBody'); if(!tb) return;
+    const tb = $('leaderBody');
     const meta = $('leaderMeta');
+    const panel = $('leader');
+    if (!tb || !panel) return;
+
+    panel.removeAttribute('hidden');
+    panel.classList.add('show');
+    panel.style.display = 'flex';
+
     try {
       const data = await API.leaderboard(500);
       const list = Array.isArray(data.data) ? data.data : [];
@@ -1911,12 +1918,13 @@ async function endAndShowLeader(){
       if (meta) meta.textContent = '排行榜載入失敗';
       tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
     }
-    const panel = $('leader'); if(panel){ panel.classList.add('show'); panel.removeAttribute('hidden'); }
   }
   function closeLeader(){ 
     const p=$('leader'); 
-    if(p){ p.classList.remove('show'); 
-      p.setAttribute('hidden',''); 
+    if(p){
+      p.classList.remove('show');
+      p.style.display = 'none';
+      p.setAttribute('hidden','');
     }
   }
 
