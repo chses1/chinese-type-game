@@ -183,6 +183,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const iceScreenGlows = []; // { t0, life } 冰凍隕石命中時整個畫面邊框泛藍光
   const effectNotices = []; // { text, t0, life, type } 畫面中央狀態提示
   const scorePopups = []; // { x, y, text, t0, life, type } 隕石附近局部分數提示
+  let finalVictory = null; // { active, startAt, duration, stats, onDone, skipHintAt, cleanup }
+
 
   // ====== NEW: 小任務 / 關卡事件 ======
   let activeMissions = [];
@@ -206,6 +208,159 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   function addScorePopup(x, y, text, type = 'normal', life = 900) {
     scorePopups.push({ x, y, text, type, t0: performance.now(), life });
+  }
+
+
+  function startFinalVictorySequence(stats = {}) {
+    return new Promise((resolve) => {
+      const now = performance.now();
+
+      meteors.forEach(m => {
+        explosions.push({ x: m.x, y: m.y, t0: now + Math.random() * 260, life: 420 });
+      });
+      meteors = [];
+
+      finalVictory = {
+        active: true,
+        startAt: now,
+        duration: 5600,
+        stats: {
+          score: Number(stats.score || 0),
+          accPct: Number(stats.accPct || 0),
+          title: String(stats.title || '🌟 地球傳奇守護者'),
+          speed: Number(stats.speed || 0)
+        },
+        onDone: () => {
+          resolve();
+        }
+      };
+
+      const skip = () => finishFinalVictorySequence(true);
+      const onKey = (e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+          e.preventDefault();
+          skip();
+        }
+      };
+      const onPointer = () => skip();
+
+      finalVictory.cleanup = () => {
+        canvas.removeEventListener('pointerdown', onPointer);
+        document.removeEventListener('keydown', onKey, true);
+      };
+
+      canvas.addEventListener('pointerdown', onPointer);
+      document.addEventListener('keydown', onKey, true);
+    });
+  }
+
+  function finishFinalVictorySequence(skipped = false) {
+    if (!finalVictory?.active) return;
+    const done = finalVictory.onDone;
+    const cleanup = finalVictory.cleanup;
+    finalVictory = null;
+    if (typeof cleanup === 'function') cleanup();
+    if (typeof done === 'function') done({ skipped });
+  }
+
+  function drawFinalVictoryOverlay(now = performance.now()) {
+    if (!finalVictory?.active) return;
+
+    const t = now - finalVictory.startAt;
+    const p = Math.max(0, Math.min(1, t / finalVictory.duration));
+    if (t >= finalVictory.duration) {
+      finishFinalVictorySequence(false);
+      return;
+    }
+
+    const fadeIn = Math.min(1, t / 700);
+    const pulse = 0.5 + Math.sin(now / 260) * 0.5;
+
+    ctx.save();
+    ctx.fillStyle = `rgba(4, 10, 22, ${0.40 + fadeIn * 0.42})`;
+    ctx.fillRect(0, 0, W, H);
+
+    const cx = W * 0.5;
+    const cy = H * 0.58;
+    const baseR = Math.min(W, H) * 0.15;
+
+    // 地球護盾波紋
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) {
+      const local = (t - i * 520) / 1800;
+      if (local < 0 || local > 1) continue;
+      const r = baseR + local * Math.min(W, H) * 0.34;
+      const a = (1 - local) * 0.28;
+      ctx.lineWidth = 10 - local * 4;
+      ctx.strokeStyle = `rgba(120, 220, 255, ${a})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 中央光暈
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.36);
+    glow.addColorStop(0, `rgba(190, 240, 255, ${0.20 + pulse * 0.12})`);
+    glow.addColorStop(0.35, `rgba(90, 190, 255, ${0.16 + pulse * 0.06})`);
+    glow.addColorStop(1, 'rgba(90, 190, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.min(W, H) * 0.36, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 上方字幕
+    const titleScale = t < 2200 ? (0.92 + Math.min(0.14, t / 2200 * 0.14)) : 1.06;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const titleY = H * 0.27;
+    ctx.shadowColor = 'rgba(255, 215, 90, 0.45)';
+    ctx.shadowBlur = 22;
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(0,0,0,0.38)';
+    ctx.font = `bold ${Math.round(Math.max(34, Math.min(68, W * 0.036)) * titleScale)}px system-ui`;
+    ctx.strokeText('🌍 地球保衛成功！', cx, titleY);
+    ctx.fillStyle = 'rgba(255, 230, 120, 1)';
+    ctx.fillText('🌍 地球保衛成功！', cx, titleY);
+
+    ctx.shadowBlur = 0;
+    ctx.font = `bold ${Math.max(20, Math.min(32, W * 0.018))}px system-ui`;
+    ctx.fillStyle = 'rgba(225, 242, 255, 0.96)';
+    ctx.fillText('第 10 關最終任務完成，敵軍已撤退', cx, titleY + 54);
+
+    if (t >= 2100) {
+      const cardW = Math.min(720, W * 0.78);
+      const cardH = Math.min(210, H * 0.28);
+      const cardX = cx - cardW / 2;
+      const cardY = H * 0.40;
+      const cardFade = Math.min(1, (t - 2100) / 550);
+
+      ctx.globalAlpha = cardFade;
+      ctx.fillStyle = 'rgba(9, 24, 52, 0.82)';
+      ctx.strokeStyle = 'rgba(255, 225, 120, 0.55)';
+      ctx.lineWidth = 2;
+      roundRectPath(cardX, cardY, cardW, cardH, 24);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255, 245, 190, 1)';
+      ctx.font = `bold ${Math.max(24, Math.min(38, W * 0.022))}px system-ui`;
+      ctx.fillText(finalVictory.stats.title || '🌟 地球傳奇守護者', cx, cardY + 42);
+
+      ctx.fillStyle = 'rgba(230, 242, 255, 0.96)';
+      ctx.font = `bold ${Math.max(18, Math.min(28, W * 0.016))}px system-ui`;
+      ctx.fillText(`最終得分 ${finalVictory.stats.score}　｜　命中率 ${finalVictory.stats.accPct}%　｜　速度 ${Math.round(finalVictory.stats.speed)} 字/分`, cx, cardY + 92);
+
+      ctx.font = `${Math.max(16, Math.min(24, W * 0.014))}px system-ui`;
+      ctx.fillStyle = 'rgba(190, 220, 255, 0.92)';
+      ctx.fillText('你成功守住了地球最後防線', cx, cardY + 132);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.78)';
+      ctx.fillText('點擊畫面或按 Enter 可跳過', cx, cardY + 170);
+    }
+    ctx.restore();
   }
 
   function buildMissionPool(){
@@ -700,6 +855,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     setScore();
     setLives();
     closeResult();
+    if (finalVictory?.active) finishFinalVictorySequence(true);
     if (!keepLogin) me = { sid:null, name:'' };
     updatePauseButton();
   }
@@ -1563,6 +1719,8 @@ function spawn(){
     ctx.fillText(n.text, W / 2, y);
     ctx.restore();
   }
+
+  drawFinalVictoryOverlay(now);
 }
 
   function calcPoints(rtMs){
@@ -1968,8 +2126,28 @@ async function endAndShowLeader(){
     }
 
     if (passed) {
-      if (level < LEVELS.length) level++;
+      const clearedFinalLevel = level >= LEVELS.length;
+      if (!clearedFinalLevel) {
+        level++;
+      }
       lives = Math.min(MAX_LIVES, lives + 1);
+
+      if (clearedFinalLevel) {
+        setLives();
+        try {
+          await startFinalVictorySequence({
+            score,
+            accPct: Math.round(acc * 100),
+            title: getDefenseTitle(acc).title,
+            speed
+          });
+        } catch (e) {
+          console.warn('final victory sequence fail', e);
+        }
+        await openLeader();
+        return;
+      }
+
       toast && toast(lives >= MAX_LIVES ? '🛡️ 過關成功，愛心已滿' : '💖 過關補回一顆愛心');
       showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
     } else {
