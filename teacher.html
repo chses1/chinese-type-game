@@ -85,7 +85,8 @@
     tr.top2 td{ background:rgba(184,214,255,.08); }
     tr.top3 td{ background:rgba(255,158,112,.08); }
     .muted{ color:#98b7d8; font-size:.9rem; }
-    .dangerZone{ display:grid; grid-template-columns: 1fr auto auto; gap:10px; align-items:end; }
+    .dangerZone{ display:grid; grid-template-columns: 1fr; gap:12px; align-items:stretch; }
+    .dangerButtons{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; }
 
     #classList.collapsed .extraChip{ display:none; }
     .showMoreWrap{ margin-top:10px; display:flex; justify-content:center; }
@@ -175,7 +176,7 @@
       <div class="overviewGrid">
         <div class="panel">
           <h2 class="sectionTitle">🧭 戰況總覽</h2>
-          <div class="sectionDesc">集中顯示目前班級競賽狀態、全班戰術事件與全班任務卡。</div>
+          <div class="sectionDesc">集中顯示目前班級競賽狀態、全班戰術事件與全班任務卡，並直接提供老師常用的競賽控制按鈕。</div>
           <div class="statusStrip">
             <div class="miniPanel">
               <div class="muted">目前狀態</div>
@@ -190,12 +191,8 @@
               <div id="activeMissionText" style="font-size:1.1rem; font-weight:800; margin-top:8px;">目前無指定任務</div>
             </div>
           </div>
-          <div class="muted" id="directiveHint" style="margin-top:12px;">老師可在「競賽控制」頁籤派送事件卡或任務卡，改變班級競賽節奏。</div>
-        </div>
-        <div class="panel">
-          <h2 class="sectionTitle">📡 快速操作</h2>
-          <div class="sectionDesc">先選班級，再決定要開始、暫停、重新開始，或派送特殊效果。</div>
-          <div class="controlGrid">
+          <div class="muted" id="directiveHint" style="margin-top:12px;">老師可在此區直接開啟競賽、開始、暫停、重來或結束班級競賽。</div>
+          <div class="controlGrid" style="margin-top:14px;">
             <div class="formCard">
               <label class="label">競賽班級（三碼）</label>
               <input id="ccClassPrefix" placeholder="301" maxlength="3" inputmode="numeric" />
@@ -224,6 +221,27 @@
             <button id="btnCcPause" class="ghost">⏸️ 全班暫停</button>
             <button id="btnCcRestart" class="ghost warning">🔄 全班重來</button>
             <button id="btnCcClose" class="ghost danger">⛔ 結束競賽</button>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 class="sectionTitle">📡 指揮提示</h2>
+          <div class="sectionDesc">建議老師先在資料管理頁選好班級，再回到本頁直接操作競賽與觀察排行榜變化。</div>
+          <div class="miniPanel" style="margin-bottom:12px;">
+            <div class="muted">建議操作流程</div>
+            <div style="font-size:1.02rem; line-height:1.9; margin-top:8px;">
+              1. 先從資料管理頁快速點選班級小膠囊。<br>
+              2. 回到戰情總覽頁按下「開啟競賽」。<br>
+              3. 確認學生進入等待畫面後，再按「全班開始」。<br>
+              4. 需要變化節奏時，再到競賽控制頁派送事件卡或任務卡。
+            </div>
+          </div>
+          <div class="miniPanel">
+            <div class="muted">目前頁面定位</div>
+            <div style="font-size:1.02rem; line-height:1.9; margin-top:8px;">
+              戰情總覽：看戰況＋直接控制競賽<br>
+              競賽控制：派送事件卡／任務卡<br>
+              資料管理：挑班級、看排行、清資料
+            </div>
           </div>
         </div>
       </div>
@@ -282,8 +300,22 @@
 
     <section id="tab-data" class="tabPanel">
       <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div>
+            <h2 class="sectionTitle" style="margin-bottom:4px;">🧩 班級清單</h2>
+            <div class="sectionDesc" style="margin:0;">放在資料管理最上方，老師可先快速點班級，再往下查看班內排行或執行資料清除。</div>
+          </div>
+          <div>
+            <button id="btnLoadClasses" class="tag">重新載入班級清單</button>
+          </div>
+        </div>
+        <div id="classList" class="classChipGrid collapsed" style="margin-top:14px;"></div>
+        <div class="showMoreWrap"><button id="btnToggleClasses" class="ghost" style="display:none;">展開全部班級</button></div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
         <h2 class="sectionTitle">📚 班級排行管理</h2>
-        <div class="sectionDesc">查看班內排行、全班統計，或清除紀錄。危險操作已獨立放在下方，降低誤按機率。</div>
+        <div class="sectionDesc">查看班內排行、全班統計，或清除紀錄。危險操作已獨立成單獨區塊，避免按鈕被截斷或說明看不完整。</div>
         <div class="controlGrid">
           <div class="formCard">
             <label class="label">班級前三碼（例如 301）</label>
@@ -303,29 +335,17 @@
             <tbody id="teacherLbBody"><tr><td colspan="3">尚未載入資料</td></tr></tbody>
           </table>
         </div>
+      </div>
 
-        <div class="panel" style="margin-top:16px; background:rgba(58,18,24,.26); border-color:rgba(255,110,128,.20);">
-          <h3 class="sectionTitle">⚠️ 危險操作區</h3>
-          <div class="dangerZone">
-            <div class="muted">請先確認班級後再操作。這些功能只在教師解鎖狀態下可用。</div>
+      <div class="panel" style="margin-top:16px; background:rgba(58,18,24,.26); border-color:rgba(255,110,128,.20);">
+        <h3 class="sectionTitle">⚠️ 危險操作區</h3>
+        <div class="muted">請先確認班級後再操作。這些功能只在教師解鎖狀態下可用，且會直接影響排行榜資料。</div>
+        <div class="dangerZone" style="margin-top:12px;">
+          <div class="dangerButtons">
             <button id="btnClearClass" class="ghost warning">🧹 清除此班級紀錄</button>
             <button id="btnClearAll" class="ghost danger">🗑️ 清除全部學生紀錄</button>
           </div>
         </div>
-      </div>
-
-      <div class="panel" style="margin-top:16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-          <div>
-            <h2 class="sectionTitle" style="margin-bottom:4px;">🧩 班級清單</h2>
-            <div class="sectionDesc" style="margin:0;">縮成膠囊排版，點一下即可帶入班級欄位與競賽班級欄位。</div>
-          </div>
-          <div>
-            <button id="btnLoadClasses" class="tag">重新載入班級清單</button>
-          </div>
-        </div>
-        <div id="classList" class="classChipGrid collapsed" style="margin-top:14px;"></div>
-        <div class="showMoreWrap"><button id="btnToggleClasses" class="ghost" style="display:none;">展開全部班級</button></div>
       </div>
     </section>
   </main>
