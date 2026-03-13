@@ -10,26 +10,41 @@ header {
   padding:.5rem .7rem;
   background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,0));
   z-index:5;
-
-  justify-content:space-between; /* 平均分布 */
+  justify-content:space-between;
 }
 
 header .chip {
-  flex:1;                      /* 每個 chip 同寬 */
+  flex:1 1 0;
+  min-width:0;
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   text-align:center;
-  padding:.35rem .6rem;
+  padding:.35rem .8rem;
   background:rgba(255,255,255,.08);
   border:1px solid rgba(255,255,255,.1);
   border-radius:999px;
-  white-space:nowrap;           /* 避免換行 */
-  overflow:hidden;              /* 超出隱藏 */
-  text-overflow:ellipsis;       /* 超出顯示省略號 */
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:clamp(18px,1.6vw,22px);
+  line-height:1.15;
+}
+
+header .chip b,
+header .chip span {
+  font-size:inherit;
 }
 
 #chipHint {
-  font-size:12px; 
-  line-height:1.2;
-  white-space:normal;           /* 提示允許斷行 */
+  flex:1.12 1 0;
+  min-width:0;
+  font-size:clamp(15px,1.1vw,19px);
+  line-height:1.15;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 #gameWrap{position:relative;width:100%;height:calc(100dvh - var(--header-h, 64px));min-height:320px;overflow:hidden;}
 #gameCanvas {
