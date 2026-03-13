@@ -119,9 +119,21 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const MAX_LIVES = 3;
   let lives = MAX_LIVES;
   const ACC_THRESHOLD = 0.8;
-  const LEVELS = [{ lpm:10, duration:60 }, { lpm:15, duration:60 }, { lpm:20, duration:60 }];
-  const spawnInterval = () => Math.max(320, Math.round(60000 / (LEVELS[level-1] || LEVELS.at(-1)).lpm));
-  const levelFallFactor = () => 1 + 0.1 * (level - 1);
+  const LEVELS = [
+    { lpm:9,  duration:60, speedMul:1.00, bossChance:0.02, goldChance:0.12, iceChance:0.12, finalBossChance:0.16, finalExtraBoss:1, eventCount:1 },
+    { lpm:10, duration:60, speedMul:1.03, bossChance:0.02, goldChance:0.12, iceChance:0.12, finalBossChance:0.17, finalExtraBoss:1, eventCount:1 },
+    { lpm:11, duration:60, speedMul:1.06, bossChance:0.03, goldChance:0.11, iceChance:0.12, finalBossChance:0.18, finalExtraBoss:1, eventCount:2 },
+    { lpm:12, duration:60, speedMul:1.09, bossChance:0.03, goldChance:0.11, iceChance:0.11, finalBossChance:0.19, finalExtraBoss:1, eventCount:2 },
+    { lpm:13, duration:60, speedMul:1.12, bossChance:0.04, goldChance:0.10, iceChance:0.11, finalBossChance:0.20, finalExtraBoss:1, eventCount:2 },
+    { lpm:14, duration:60, speedMul:1.15, bossChance:0.04, goldChance:0.10, iceChance:0.10, finalBossChance:0.21, finalExtraBoss:1, eventCount:2 },
+    { lpm:15, duration:60, speedMul:1.18, bossChance:0.05, goldChance:0.10, iceChance:0.10, finalBossChance:0.22, finalExtraBoss:2, eventCount:2 },
+    { lpm:16, duration:60, speedMul:1.21, bossChance:0.05, goldChance:0.09, iceChance:0.10, finalBossChance:0.23, finalExtraBoss:2, eventCount:2 },
+    { lpm:17, duration:60, speedMul:1.24, bossChance:0.06, goldChance:0.09, iceChance:0.09, finalBossChance:0.24, finalExtraBoss:2, eventCount:2 },
+    { lpm:18, duration:60, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2 }
+  ];
+  const getLevelCfg = () => LEVELS[level - 1] || LEVELS.at(-1);
+  const spawnInterval = () => Math.max(320, Math.round(60000 / getLevelCfg().lpm));
+  const levelFallFactor = () => getLevelCfg().speedMul;
 
   let W,H;
   function applyViewportLayout(){
@@ -243,15 +255,16 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     activeEvent = null;
     lastEventTriggerTime = null;
 
-    const roundDuration = (LEVELS[level - 1]?.duration) || 60;
+    const roundDuration = getLevelCfg().duration || 60;
+    const eventCount = Math.max(0, Math.min(EVENT_MAX_PER_ROUND, Number(getLevelCfg().eventCount || EVENT_MAX_PER_ROUND)));
 
-    // 每關最多 2 個事件，並避開最後 Boss 波次區
+    // 前兩關只出 1 次事件，其餘關卡最多 2 次，並避開最後最終警報區
     const candidates = [
       roundDuration - 18,
       roundDuration - 38
     ]
-      .filter(t => t > (BOSS_PHASE_SECONDS + 2) && t > 0)
-      .slice(0, EVENT_MAX_PER_ROUND);
+      .filter(t => t > (FINAL_ALERT_SECONDS + 2) && t > 0)
+      .slice(0, eventCount);
 
     eventTriggerTimes = candidates.sort((a, b) => b - a);
   }
@@ -264,19 +277,19 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   function getEventPool(){
     return [
       {
-        id:'meteorShower', icon:'☄️', label:'流星雨', desc:'10 秒內額外落下 3～4 顆流星',
-        durationMs: EVENT_DURATION_MS, spawnMul:0.92,
-        guaranteedType:'normal', extraSpawnTotal:4, maxConcurrent:8
+        id:'meteorShower', icon:'☄️', label:'流星雨', desc:'10 秒內額外落下 3～4 顆高速流星',
+        durationMs: EVENT_DURATION_MS, spawnMul:0.94,
+        guaranteedType:'normal', extraSpawnTotal:4, maxConcurrent:8, extraSpeedMul:1.22
       },
       {
-        id:'goldRush', icon:'✨', label:'黃金時刻', desc:'穩定追加少量黃金隕石',
-        durationMs: EVENT_DURATION_MS, goldBonus:0.10, bossPenalty:0.01,
+        id:'goldRush', icon:'✨', label:'黃金時刻', desc:'黃金隕石機率提升至 25%',
+        durationMs: EVENT_DURATION_MS, goldChanceOverride:0.25, bossPenalty:0.01,
         guaranteedType:'gold', extraSpawnTotal:1, maxConcurrent:6
       },
       {
-        id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場慢速並持續顯示寒流邊框',
-        durationMs: EVENT_DURATION_MS, globalSlow:0.82, iceBonus:0.08,
-        guaranteedType:'ice', extraSpawnTotal:1, maxConcurrent:6
+        id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場減速 10 秒並持續顯示寒流邊框',
+        durationMs: EVENT_DURATION_MS, globalSlow:0.84, iceBonus:0.08,
+        guaranteedType:'ice', extraSpawnTotal:1, maxConcurrent:6, persistentGlow:true
       }
     ];
   }
@@ -483,10 +496,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       }];
     }
 
-    if (isBossPhase()) {
+    if (dangerMode) {
       return [{
-        icon: '👾',
-        label: 'Boss 波次中',
+        icon: '🚨',
+        label: `最終警報 ${Math.max(1, timeLeft)} 秒`,
         type: 'boss'
       }];
     }
@@ -511,12 +524,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       life: 90 // ms：越小越「瞬間」
     });
   }
-    const GOLD_CHANCE = 0.10; // 黃金隕石機率（10%）
-  const ICE_CHANCE  = 0.10; // 冰凍隕石機率（10%）
-  const BOSS_CHANCE = 0.04; // 平常 Boss 隕石機率（4%）
-  const BOSS_PHASE_CHANCE = 0.28; // Boss 波次時機率（28%）
-  const BOSS_PHASE_SECONDS = 12;  // 最後 12 秒進入 Boss 波次
-  const DANGER_SECONDS = 10;      // 最後 10 秒警報模式
+    const FINAL_ALERT_SECONDS = 10;  // 最後 10 秒進入最終警報
+  const FINAL_ALERT_SPEED_BOOST = 1.08; // 最終警報時全場微加速
   const COMBO_BOOST_MS = 10000;   // 連擊滿條後 10 秒雙倍分數
 
   // 關卡事件設定
@@ -570,7 +579,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const setLives=()=>{ const el=$('lives'); if(el) el.textContent = '❤️'.repeat(Math.max(0,lives)) + '🤍'.repeat(Math.max(0,MAX_LIVES-lives)); };
 
   function isBossPhase(){
-    return running && timeLeft <= BOSS_PHASE_SECONDS;
+    return running && timeLeft <= FINAL_ALERT_SECONDS;
   }
 
   function setDangerUI(){
@@ -609,7 +618,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     effectNotices.length = 0;
     scorePopups.length = 0;
     earthHits.length = 0;
-    timeLeft = (LEVELS[level-1]?.duration) || 60;
+    timeLeft = getLevelCfg().duration || 60;
     resetMissionAndEvents({ keepExisting });
     setTime();
     draw();
@@ -871,12 +880,13 @@ const keyPositions = {};
 function chooseMeteorType(){
   let type = 'normal';
   const eventState = getEventState();
+  const cfg = getLevelCfg();
   const r = Math.random();
-  const bossChanceBase = isBossPhase() ? BOSS_PHASE_CHANCE : BOSS_CHANCE;
-  const goldChanceBase = isBossPhase() ? Math.max(0.03, GOLD_CHANCE * 0.45) : GOLD_CHANCE;
-  const iceChanceBase  = isBossPhase() ? Math.max(0.03, ICE_CHANCE * 0.45)  : ICE_CHANCE;
+  const bossChanceBase = isBossPhase() ? cfg.finalBossChance : cfg.bossChance;
+  const goldChanceBase = cfg.goldChance;
+  const iceChanceBase  = cfg.iceChance;
   const bossChance = Math.max(0.01, bossChanceBase - (eventState?.bossPenalty || 0));
-  const goldChance = Math.min(0.35, goldChanceBase + (eventState?.goldBonus || 0));
+  const goldChance = Math.min(0.35, eventState?.goldChanceOverride ?? (goldChanceBase + (eventState?.goldBonus || 0)));
   const iceChance  = Math.min(0.30, iceChanceBase + (eventState?.iceBonus || 0));
 
   if (r < bossChance) type = 'boss';
@@ -885,7 +895,7 @@ function chooseMeteorType(){
   return type;
 }
 
-function spawnMeteor(forceType = null, forceLabel = null){
+function spawnMeteor(forceType = null, forceLabel = null, options = {}){
   const label = forceLabel || ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
   const type = forceType || chooseMeteorType();
 
@@ -904,8 +914,8 @@ function spawnMeteor(forceType = null, forceLabel = null){
   const dy = targetY - startY;
   const len = Math.hypot(dx, dy) || 1;
 
-  const baseSpeed = 2.2;
-  const typeSpeed = (type === 'boss') ? 1.9 : (type === 'ice' ? 2.35 : baseSpeed);
+  const speedMap = { normal:2.2, gold:2.45, ice:2.0, boss:1.95 };
+  const typeSpeed = (speedMap[type] || speedMap.normal) * (Number(options.speedMul) || 1);
 
   const vx = (dx / len) * typeSpeed;
   const vy = (dy / len) * typeSpeed;
@@ -949,7 +959,7 @@ function processEventExtraSpawns(deltaMs = 16){
   }
 
   eventExtraSpawnTimer = 0;
-  if (spawnMeteor(eventState.guaranteedType)) {
+  if (spawnMeteor(eventState.guaranteedType, null, { speedMul: eventState.extraSpeedMul || 1 })) {
     eventState.extraSpawned = (eventState.extraSpawned || 0) + 1;
   }
 }
@@ -961,11 +971,11 @@ function processBossPhaseExtraSpawns(deltaMs = 16){
     return;
   }
 
-  const bossTargetTotal = 2;
+  const bossTargetTotal = Math.max(0, Number(getLevelCfg().finalExtraBoss || 0));
   if (bossPhaseExtraSpawned >= bossTargetTotal) return;
 
   bossPhaseSpawnTimer += deltaMs;
-  const bossInterval = Math.max(spawnInterval() * 2.4, (BOSS_PHASE_SECONDS * 1000) / bossTargetTotal);
+  const bossInterval = Math.max(spawnInterval() * 2.4, (FINAL_ALERT_SECONDS * 1000) / Math.max(1, bossTargetTotal));
   if (bossPhaseSpawnTimer < bossInterval) return;
   if (meteors.length >= 6) {
     bossPhaseSpawnTimer = Math.min(bossInterval, bossPhaseSpawnTimer - deltaMs * 0.35);
@@ -1238,6 +1248,43 @@ function spawn(){
     ctx.strokeStyle = `rgba(210,248,255,${Math.min(0.95, a + 0.16)})`;
     ctx.lineWidth = 6 + (1 - t) * 6;
     ctx.strokeRect(8, 8, W - 16, H - 16);
+    ctx.restore();
+  }
+
+  const persistentIceWind = activeEvent?.id === 'iceWind' && now < activeEvent.endsAt;
+  if (persistentIceWind) {
+    const a = 0.16 + Math.abs(Math.sin(now / 260)) * 0.08;
+    const edge = 26;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    const topGrad = ctx.createLinearGradient(0, 0, 0, edge * 4);
+    topGrad.addColorStop(0, `rgba(170,235,255,${a + 0.12})`);
+    topGrad.addColorStop(1, 'rgba(170,235,255,0)');
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, W, edge * 4);
+
+    const bottomGrad = ctx.createLinearGradient(0, H, 0, H - edge * 4);
+    bottomGrad.addColorStop(0, `rgba(170,235,255,${a + 0.12})`);
+    bottomGrad.addColorStop(1, 'rgba(170,235,255,0)');
+    ctx.fillStyle = bottomGrad;
+    ctx.fillRect(0, H - edge * 4, W, edge * 4);
+
+    const leftGrad = ctx.createLinearGradient(0, 0, edge * 4, 0);
+    leftGrad.addColorStop(0, `rgba(150,225,255,${a})`);
+    leftGrad.addColorStop(1, 'rgba(150,225,255,0)');
+    ctx.fillStyle = leftGrad;
+    ctx.fillRect(0, 0, edge * 4, H);
+
+    const rightGrad = ctx.createLinearGradient(W, 0, W - edge * 4, 0);
+    rightGrad.addColorStop(0, `rgba(150,225,255,${a})`);
+    rightGrad.addColorStop(1, 'rgba(150,225,255,0)');
+    ctx.fillStyle = rightGrad;
+    ctx.fillRect(W - edge * 4, 0, edge * 4, H);
+
+    ctx.strokeStyle = `rgba(210,248,255,${a + 0.18})`;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(10, 10, W - 20, H - 20);
     ctx.restore();
   }
 
@@ -1556,7 +1603,7 @@ function spawn(){
 
   function step(){
     if(running){
-      dangerMode = timeLeft <= DANGER_SECONDS;
+      dangerMode = timeLeft <= FINAL_ALERT_SECONDS;
       setDangerUI();
       const eventState = getEventState();
       const spawnRateMul = eventState?.spawnMul || 1;
@@ -1564,10 +1611,10 @@ function spawn(){
       if (spawnTimer > (spawnInterval() * spawnRateMul)) { spawn(); spawnTimer = 0; }
       processEventExtraSpawns(16);
       processBossPhaseExtraSpawns(16);
-      const f = 1 + 0.08 * (level - 1); // ✅ 等級加速，但不要太兇（0.08 比 0.1 更溫和）
+      const f = levelFallFactor();
 const slow = (performance.now() < slowUntil) ? SLOW_FACTOR : 1;
 const eventSlow = eventState?.globalSlow || 1;
-const dangerBoost = dangerMode ? 1.15 : 1;
+const dangerBoost = dangerMode ? FINAL_ALERT_SPEED_BOOST : 1;
 meteors.forEach(m => {
   m.x += m.vx * 2 * f * slow * eventSlow * dangerBoost;
   m.y += m.vy * 2 * f * slow * eventSlow * dangerBoost;
@@ -1674,18 +1721,16 @@ async function endAndShowLeader(){
 
   let timerId=null;
   function ticker(){ clearInterval(timerId); timerId=setInterval(()=>{ if(!running) return; timeLeft--; setTime();
-      dangerMode = timeLeft <= DANGER_SECONDS;
+      dangerMode = timeLeft <= FINAL_ALERT_SECONDS;
       setDangerUI();
       if (dangerMode && !dangerAlertShown) {
         dangerAlertShown = true;
-        toast && toast('🚨 最後 10 秒警報！');
+        toast && toast('🚨 最終警報！');
+        showCenterNotice('🚨 最終警報', 1600, 'boss');
       }
       if (eventTriggerTimes.length && timeLeft <= eventTriggerTimes[0] && lastEventTriggerTime !== eventTriggerTimes[0]) {
         lastEventTriggerTime = eventTriggerTimes.shift();
         triggerRoundEvent();
-      }
-      if (timeLeft === BOSS_PHASE_SECONDS) {
-        showCenterNotice('👾 Boss 波次', 1500, 'boss');
       }
       if(timeLeft<=0 && !gameEnded){
       gameEnded = true;
