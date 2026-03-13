@@ -2053,7 +2053,7 @@ async function endAndShowLeader(){
 
   function buildResultOutcomeText({ passed, gameOver, livesLeft, acc }){
     if (gameOver) return '💀 地球防線崩潰，請重新整備後再出發';
-    if (passed) return livesLeft >= MAX_LIVES ? '✅ 防衛成功！地球毫髮無傷，接關次數已滿' : `✅ 防衛成功！補回一次接關，目前 ${livesLeft}/${MAX_LIVES}`;
+    if (passed) return `✅ 防衛成功！目前接關次數 ${livesLeft}/${MAX_LIVES}`;
     const needPct = Math.max(0, Math.ceil((ACC_THRESHOLD - acc) * 100));
     return `⚠️ 防線仍有缺口，再提升約 ${needPct}% 命中率就能過關`;
   }
@@ -2180,7 +2180,8 @@ async function endAndShowLeader(){
       if (!clearedFinalLevel) {
         level++;
       }
-      lives = Math.min(MAX_LIVES, lives + 1);
+      // 取消「過關補心」機制：通關後不再恢復接關次數
+      lives = Math.max(0, Math.min(MAX_LIVES, lives));
 
       if (clearedFinalLevel) {
         setLives();
@@ -2206,7 +2207,7 @@ async function endAndShowLeader(){
         return;
       }
 
-      toast && toast(lives >= MAX_LIVES ? '🛡️ 過關成功，愛心已滿' : '💖 過關補回一顆愛心');
+      toast && toast(`🛡️ 過關成功，目前接關次數 ${lives}/${MAX_LIVES}`);
       showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
     } else {
       lives = Math.max(0, lives - 1);
