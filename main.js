@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   
     const ctx = canvas.getContext('2d');
+  let canDraw = false;
 
   function roundRectPath(x, y, w, h, r = 12) {
     const rr = Math.max(0, Math.min(r, Math.min(w, h) / 2));
@@ -80,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const earthBgImg = new Image();
   let earthBgReady = false;
-  earthBgImg.onload = () => { earthBgReady = true; draw(); };
+  earthBgImg.onload = () => { earthBgReady = true; if (canDraw) draw(); };
   setImageSrcFromCandidates(earthBgImg, ['earth_bg.png', './earth_bg.png', 'img/earth_bg.png', './img/earth_bg.png']);
 
   // ===== 四種隕石圖片（請放在 /img/ 目錄）=====
@@ -145,7 +146,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     W=canvas.width=Math.max(1, Math.floor(r.width*dpr));
     H=canvas.height=Math.max(1, Math.floor(r.height*dpr));
-    draw();
+    if (canDraw) draw();
   }
   resize();
   addEventListener('resize', ()=>{ resize(); setTimeout(resize, 60); });
@@ -1962,6 +1963,6 @@ async function endAndShowLeader(){
   });
 
   // 初始化
-  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); setBest(); applyViewportLayout(); resize(); updateKeyPositions(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
+  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); setBest(); canDraw = true; applyViewportLayout(); resize(); updateKeyPositions(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
   window.addEventListener('beforeunload', () => { stopClassroomPolling(); stopHeartbeat(); });
 });
