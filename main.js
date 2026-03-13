@@ -118,7 +118,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let level = 1;
   const MAX_LIVES = 3;
   let lives = MAX_LIVES;
-  const ACC_THRESHOLD = 0;
+  const ACC_THRESHOLD = 0.8;
   const LEVELS = [
     { lpm:9,  duration:60, speedMul:1.00, bossChance:0.02, goldChance:0.12, iceChance:0.12, finalBossChance:0.16, finalExtraBoss:1, eventCount:1 },
     { lpm:10, duration:60, speedMul:1.03, bossChance:0.02, goldChance:0.12, iceChance:0.12, finalBossChance:0.17, finalExtraBoss:1, eventCount:1 },
@@ -130,6 +130,9 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     { lpm:16, duration:60, speedMul:1.21, bossChance:0.05, goldChance:0.09, iceChance:0.10, finalBossChance:0.23, finalExtraBoss:2, eventCount:2 },
     { lpm:17, duration:60, speedMul:1.24, bossChance:0.06, goldChance:0.09, iceChance:0.09, finalBossChance:0.24, finalExtraBoss:2, eventCount:2 },
     { lpm:18, duration:60, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2 }
+  ];
+  const LEVEL_NAMES = [
+    '新兵試煉','近地軌道防線','流星攔截戰','冰封空域','黃金突襲','雙星危機','極速防衛網','重力亂流區','終極警戒線','地球最終決戰'
   ];
   const getLevelCfg = () => LEVELS[level - 1] || LEVELS.at(-1);
   const spawnInterval = () => Math.max(320, Math.round(60000 / getLevelCfg().lpm));
@@ -792,6 +795,13 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const setTime =()=>$('time') && ($('time').textContent=timeLeft);
   const setLives=()=>{ const el=$('lives'); if(el) el.textContent = '❤️'.repeat(Math.max(0,lives)) + '🤍'.repeat(Math.max(0,MAX_LIVES-lives)); };
 
+  function updateStageChip(){
+    const el = $('chipHint');
+    if (!el) return;
+    const name = LEVEL_NAMES[Math.max(0, Math.min(LEVEL_NAMES.length - 1, level - 1))] || `第 ${level} 關`;
+    el.textContent = `關卡：第 ${level} 關｜${name}`;
+  }
+
   function isBossPhase(){
     return running && timeLeft <= FINAL_ALERT_SECONDS;
   }
@@ -841,6 +851,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       applyForcedEventById(classroomForcedEventId, 'teacher');
     }
     setTime();
+    updateStageChip();
     draw();
   }
 
@@ -854,6 +865,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     resetRoundState({ keepExisting:false });
     setScore();
     setLives();
+    updateStageChip();
     closeResult();
     if (finalVictory?.active) finishFinalVictorySequence(true);
     if (!keepLogin) me = { sid:null, name:'' };
@@ -2021,7 +2033,7 @@ async function endAndShowLeader(){
 
   function buildResultOutcomeText({ passed, gameOver, livesLeft, acc }){
     if (gameOver) return '💀 地球防線崩潰，請重新整備後再出發';
-    if (passed) return livesLeft >= MAX_LIVES ? '✅ 防衛成功！地球毫髮無傷，愛心已滿' : `✅ 防衛成功！補回一顆愛心，目前 ${livesLeft}/${MAX_LIVES}`;
+    if (passed) return livesLeft >= MAX_LIVES ? '✅ 防衛成功！地球毫髮無傷，接關次數已滿' : `✅ 防衛成功！補回一次接關，目前 ${livesLeft}/${MAX_LIVES}`;
     const needPct = Math.max(0, Math.ceil((ACC_THRESHOLD - acc) * 100));
     return `⚠️ 防線仍有缺口，再提升約 ${needPct}% 命中率就能過關`;
   }
@@ -2313,6 +2325,6 @@ async function endAndShowLeader(){
   });
 
   // 初始化
-  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); setBest(); canDraw = true; applyViewportLayout(); resize(); updateKeyPositions(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
+  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); updateStageChip(); setBest(); canDraw = true; applyViewportLayout(); resize(); updateKeyPositions(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
   window.addEventListener('beforeunload', () => { stopClassroomPolling(); stopHeartbeat(); });
 });
