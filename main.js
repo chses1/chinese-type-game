@@ -115,7 +115,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
 
   // === 等級 & 速度 ===
-  let level = 10;
+  let level = 1;
   const MAX_LIVES = 3;
   let lives = MAX_LIVES;
   const ACC_THRESHOLD = 0;
@@ -129,7 +129,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     { lpm:15, duration:60, speedMul:1.18, bossChance:0.05, goldChance:0.10, iceChance:0.10, finalBossChance:0.22, finalExtraBoss:2, eventCount:2 },
     { lpm:16, duration:60, speedMul:1.21, bossChance:0.05, goldChance:0.09, iceChance:0.10, finalBossChance:0.23, finalExtraBoss:2, eventCount:2 },
     { lpm:17, duration:60, speedMul:1.24, bossChance:0.06, goldChance:0.09, iceChance:0.09, finalBossChance:0.24, finalExtraBoss:2, eventCount:2 },
-    { lpm:18, duration:20, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2 }
+    { lpm:18, duration:60, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2 }
   ];
   const getLevelCfg = () => LEVELS[level - 1] || LEVELS.at(-1);
   const spawnInterval = () => Math.max(320, Math.round(60000 / getLevelCfg().lpm));
@@ -848,7 +848,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     gameEnded = false;
     running = false;
     clearInterval(timerId);
-    level = 10;
+    level = 1;
     lives = MAX_LIVES;
     score = 0;
     resetRoundState({ keepExisting:false });
