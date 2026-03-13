@@ -168,7 +168,7 @@ function renderHud(){
   $('activeEventText').textContent = eventName;
   $('activeMissionText').textContent = missionName;
 
-  let hint = '老師可在「戰情總覽」直接控制開關與開始暫停，再到「競賽控制」派送事件卡或任務卡。';
+  let hint = '老師可在「戰情總覽」直接完成競賽控制，並在右側戰術派送區派送事件卡或任務卡。';
   if (c?.forcedEventIssuedAt || c?.forcedMissionIssuedAt) {
     const parts = [];
     if (c.forcedEventIssuedAt) parts.push(`事件更新於 ${formatAgo(c.forcedEventIssuedAt)}`);

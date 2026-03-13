@@ -168,7 +168,6 @@
 
     <nav class="tabs">
       <button class="tabBtn active" data-tab="overview">🛰️ 戰情總覽</button>
-      <button class="tabBtn" data-tab="control">🎮 競賽控制</button>
       <button class="tabBtn" data-tab="data">🗂️ 資料管理</button>
     </nav>
 
@@ -224,23 +223,28 @@
           </div>
         </div>
         <div class="panel">
-          <h2 class="sectionTitle">📡 指揮提示</h2>
-          <div class="sectionDesc">建議老師先在資料管理頁選好班級，再回到本頁直接操作競賽與觀察排行榜變化。</div>
+          <h2 class="sectionTitle">🛰️ 戰術派送區</h2>
+          <div class="sectionDesc">將原本競賽控制分頁整合到戰情總覽頁。老師可在此直接派送事件卡與任務卡，快速改變班級競賽節奏。</div>
+
           <div class="miniPanel" style="margin-bottom:12px;">
-            <div class="muted">建議操作流程</div>
-            <div style="font-size:1.02rem; line-height:1.9; margin-top:8px;">
-              1. 先從資料管理頁快速點選班級小膠囊。<br>
-              2. 回到戰情總覽頁按下「開啟競賽」。<br>
-              3. 確認學生進入等待畫面後，再按「全班開始」。<br>
-              4. 需要變化節奏時，再到競賽控制頁派送事件卡或任務卡。
+            <div class="muted">戰術事件卡</div>
+            <div class="eventGrid" style="margin-top:10px;">
+              <button class="eventBtn" data-event="meteorShower"><span>☄️ 流星雨</span><small>10 秒內額外掉落 3～4 顆</small></button>
+              <button class="eventBtn" data-event="iceWind"><span>🧊 冰風暴</span><small>全場減速並顯示寒流邊框</small></button>
+              <button class="eventBtn" data-event="goldRush"><span>✨ 黃金時刻</span><small>黃金隕石機率提高</small></button>
+              <button class="eventBtn" data-event="bossWave"><span>👾 Boss 波次</span><small>立即進入 Boss 壓力波</small></button>
             </div>
           </div>
+
           <div class="miniPanel">
-            <div class="muted">目前頁面定位</div>
-            <div style="font-size:1.02rem; line-height:1.9; margin-top:8px;">
-              戰情總覽：看戰況＋直接控制競賽<br>
-              競賽控制：派送事件卡／任務卡<br>
-              資料管理：挑班級、看排行、清資料
+            <div class="muted">全班任務卡</div>
+            <div class="missionGrid" style="margin-top:10px;">
+              <button class="missionBtn" data-mission="goldHunter"><span>✨ 黃金獵人</span><small>打中 3 顆黃金隕石</small></button>
+              <button class="missionBtn" data-mission="iceBreaker"><span>❄️ 冰凍專家</span><small>打中 2 顆冰凍隕石</small></button>
+              <button class="missionBtn" data-mission="comboMaster"><span>🔥 連擊高手</span><small>達成 10 連擊</small></button>
+              <button class="missionBtn" data-mission="quickShot"><span>⚡ 快速反應</span><small>完成 5 次快速擊落</small></button>
+              <button class="missionBtn" data-mission="bossBreaker"><span>👾 Boss 剋星</span><small>命中 Boss 4 次</small></button>
+              <button class="missionBtn" data-mission="random"><span>🎲 隨機任務</span><small>系統隨機派送一張任務</small></button>
             </div>
           </div>
         </div>
@@ -268,32 +272,6 @@
               <tbody id="onlineStudentsBody"><tr><td colspan="5">尚未載入資料</td></tr></tbody>
             </table>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="tab-control" class="tabPanel">
-      <div class="panel">
-        <h2 class="sectionTitle">🎯 戰術事件控制</h2>
-        <div class="sectionDesc">事件卡會立即套用到目前競賽中的班級，影響該班所有學生的遊戲節奏。每次派送後有短暫冷卻，避免連續誤觸。</div>
-        <div class="eventGrid">
-          <button class="eventBtn" data-event="meteorShower"><span>☄️ 流星雨</span><small>10 秒內額外掉落 3～4 顆</small></button>
-          <button class="eventBtn" data-event="iceWind"><span>🧊 冰風暴</span><small>全場減速並顯示寒流邊框</small></button>
-          <button class="eventBtn" data-event="goldRush"><span>✨ 黃金時刻</span><small>黃金隕石機率提高</small></button>
-          <button class="eventBtn" data-event="bossWave"><span>👾 Boss 波次</span><small>立即進入 Boss 壓力波</small></button>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-top:16px;">
-        <h2 class="sectionTitle">📝 全班任務卡控制</h2>
-        <div class="sectionDesc">派送後會直接替換該班目前顯示的任務卡，讓老師可在競賽中主動調整挑戰目標。</div>
-        <div class="missionGrid">
-          <button class="missionBtn" data-mission="goldHunter"><span>✨ 黃金獵人</span><small>打中 3 顆黃金隕石</small></button>
-          <button class="missionBtn" data-mission="iceBreaker"><span>❄️ 冰凍專家</span><small>打中 2 顆冰凍隕石</small></button>
-          <button class="missionBtn" data-mission="comboMaster"><span>🔥 連擊高手</span><small>達成 10 連擊</small></button>
-          <button class="missionBtn" data-mission="quickShot"><span>⚡ 快速反應</span><small>完成 5 次快速擊落</small></button>
-          <button class="missionBtn" data-mission="bossBreaker"><span>👾 Boss 剋星</span><small>命中 Boss 4 次</small></button>
-          <button class="missionBtn" data-mission="random"><span>🎲 隨機任務</span><small>系統隨機派送一張任務</small></button>
         </div>
       </div>
     </section>
