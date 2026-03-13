@@ -123,12 +123,32 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const levelFallFactor = () => 1 + 0.1 * (level - 1);
 
   let W,H;
-  function resize(){
-    const r=canvas.getBoundingClientRect();
-    W=canvas.width=Math.floor(r.width*2);
-    H=canvas.height=Math.floor(r.height*2);
+  function applyViewportLayout(){
+    const headerEl = document.querySelector('header');
+    const kbdEl = $('kbd');
+    const wrapEl = $('gameWrap');
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    const headerH = Math.ceil(headerEl?.getBoundingClientRect().height || 64);
+    const kbdH = Math.ceil(kbdEl?.getBoundingClientRect().height || 280);
+    document.documentElement.style.setProperty('--header-h', `${headerH}px`);
+    document.documentElement.style.setProperty('--kbd-h', `${kbdH}px`);
+    if (wrapEl) {
+      const usable = Math.max(320, vh - headerH - kbdH);
+      wrapEl.style.height = `${usable}px`;
+      wrapEl.style.minHeight = `${usable}px`;
+    }
   }
-  resize(); addEventListener('resize', resize);
+
+  function resize(){
+    applyViewportLayout();
+    const r=canvas.getBoundingClientRect();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    W=canvas.width=Math.max(1, Math.floor(r.width*dpr));
+    H=canvas.height=Math.max(1, Math.floor(r.height*dpr));
+    draw();
+  }
+  resize();
+  addEventListener('resize', ()=>{ resize(); setTimeout(resize, 60); });
 
   // 狀態
   let meteors=[]; let running=false, score=0, timeLeft=(LEVELS[0].duration), spawnTimer=0;
@@ -728,6 +748,21 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 // 🔑 記錄每個注音鍵在 canvas 中對應的位置
 const keyPositions = {};
 
+  function updateKeyPositions(){
+    const canvasRect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / Math.max(1, canvasRect.width);
+    const scaleY = canvas.height / Math.max(1, canvasRect.height);
+    document.querySelectorAll('#kbd .key').forEach((btn) => {
+      const ch = btn.dataset.key;
+      if (!ch) return;
+      const rect = btn.getBoundingClientRect();
+      keyPositions[ch] = {
+        x: (rect.left + rect.width / 2 - canvasRect.left) * scaleX,
+        y: (rect.top - canvasRect.top) * scaleY
+      };
+    });
+  }
+
   function buildKeyboard(){
   // ✅ 右側控制鍵：放在 ㄦ 鍵的下方
   // - ㄦ 在第 1 列最後一格
@@ -796,22 +831,21 @@ const keyPositions = {};
         b.onclick=()=>pressKey(ch);
       }
 
-      // 記錄鍵盤按鍵在 canvas 座標中的位置（給隕石瞄準用）
-      requestAnimationFrame(() => {
-        const rect = b.getBoundingClientRect();
-        const canvasRect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / canvasRect.width;
-        const scaleY = canvas.height / canvasRect.height;
-
-        keyPositions[ch] = {
-          x: (rect.left + rect.width / 2 - canvasRect.left) * scaleX,
-          y: (rect.top - canvasRect.top) * scaleY
-        };
-      });
-
+      b.dataset.key = ch;
       row.appendChild(b);
     });
     kbd.appendChild(row);
+  });
+
+  requestAnimationFrame(() => {
+    applyViewportLayout();
+    resize();
+    updateKeyPositions();
+    setTimeout(() => {
+      applyViewportLayout();
+      resize();
+      updateKeyPositions();
+    }, 60);
   });
 }
 
@@ -1928,6 +1962,6 @@ async function endAndShowLeader(){
   });
 
   // 初始化
-  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); setBest(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
+  buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); setBest(); applyViewportLayout(); resize(); updateKeyPositions(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
   window.addEventListener('beforeunload', () => { stopClassroomPolling(); stopHeartbeat(); });
 });
