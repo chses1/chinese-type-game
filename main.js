@@ -134,9 +134,11 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     document.documentElement.style.setProperty('--header-h', `${headerH}px`);
     document.documentElement.style.setProperty('--kbd-h', `${kbdH}px`);
     if (wrapEl) {
-      const usable = Math.max(320, vh - headerH - kbdH);
+      // 鍵盤是 fixed 疊在畫面上方，所以遊戲畫布要延伸到鍵盤底下，不能把鍵盤高度扣掉。
+      const usable = Math.max(320, vh - headerH);
       wrapEl.style.height = `${usable}px`;
       wrapEl.style.minHeight = `${usable}px`;
+      wrapEl.style.marginTop = `${headerH}px`;
     }
   }
 
@@ -349,9 +351,21 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   }
 
   function getKeyboardTopY(){
-    const values = Object.values(keyPositions).filter(p => p && Number.isFinite(p.y)).map(p => p.y);
+    const kbdEl = $('kbd');
+    const canvasRect = canvas.getBoundingClientRect();
+    const kbdRect = kbdEl?.getBoundingClientRect();
+
+    if (kbdRect && canvasRect && kbdRect.top < canvasRect.bottom) {
+      const scaleY = canvas.height / Math.max(1, canvasRect.height);
+      const topInCanvas = (kbdRect.top - canvasRect.top) * scaleY;
+      return Math.max(120, Math.min(H - 90, topInCanvas));
+    }
+
+    const values = Object.values(keyPositions)
+      .filter(p => p && Number.isFinite(p.y))
+      .map(p => Math.max(0, Math.min(H, p.y)));
     if (!values.length) return H - 180;
-    return Math.min(...values);
+    return Math.max(120, Math.min(H - 90, Math.min(...values)));
   }
 
   function getBottomHudLayout(itemCount = 1) {
@@ -359,7 +373,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     const gap = 14;
     const totalItems = Math.max(1, itemCount);
     const keyboardTop = getKeyboardTopY();
-    const y = Math.max(88, keyboardTop - 88);
+    const capsuleH = 58;
+    const y = Math.max(88, Math.min(H - capsuleH - 18, keyboardTop - capsuleH - 14));
     const maxW = W - safeMargin * 2;
     const capsuleW = Math.max(180, Math.min(280, (maxW - gap * (totalItems - 1)) / totalItems));
     const totalW = capsuleW * totalItems + gap * Math.max(0, totalItems - 1);
@@ -368,7 +383,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       x: startX,
       y,
       w: capsuleW,
-      h: 58,
+      h: capsuleH,
       gap,
       radius: 999
     };
