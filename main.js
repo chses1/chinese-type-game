@@ -129,7 +129,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     { lpm:15, duration:60, speedMul:1.18, bossChance:0.05, goldChance:0.10, iceChance:0.10, finalBossChance:0.22, finalExtraBoss:2, eventCount:2 },
     { lpm:16, duration:60, speedMul:1.21, bossChance:0.05, goldChance:0.09, iceChance:0.10, finalBossChance:0.23, finalExtraBoss:2, eventCount:2 },
     { lpm:17, duration:60, speedMul:1.24, bossChance:0.06, goldChance:0.09, iceChance:0.09, finalBossChance:0.24, finalExtraBoss:2, eventCount:2 },
-    { lpm:18, duration:5, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2 }
+    { lpm:18, duration:20, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2 }
   ];
   const getLevelCfg = () => LEVELS[level - 1] || LEVELS.at(-1);
   const spawnInterval = () => Math.max(320, Math.round(60000 / getLevelCfg().lpm));
@@ -1846,52 +1846,70 @@ function spawn(){
   }
 
   function step(){
-    if(running){
+    const now = performance.now();
+
+    if (running) {
       dangerMode = timeLeft <= FINAL_ALERT_SECONDS;
       setDangerUI();
       const eventState = getEventState();
       const spawnRateMul = eventState?.spawnMul || 1;
+
       spawnTimer += 16;
-      if (spawnTimer > (spawnInterval() * spawnRateMul)) { spawn(); spawnTimer = 0; }
+      if (spawnTimer > (spawnInterval() * spawnRateMul)) {
+        spawn();
+        spawnTimer = 0;
+      }
+
       processEventExtraSpawns(16);
       processBossPhaseExtraSpawns(16);
+
       const f = levelFallFactor();
-const slow = (performance.now() < slowUntil) ? SLOW_FACTOR : 1;
-const eventSlow = eventState?.globalSlow || 1;
-const dangerBoost = dangerMode ? FINAL_ALERT_SPEED_BOOST : 1;
-meteors.forEach(m => {
-  m.x += m.vx * 2 * f * slow * eventSlow * dangerBoost;
-  m.y += m.vy * 2 * f * slow * eventSlow * dangerBoost;
-});
+      const slow = (now < slowUntil) ? SLOW_FACTOR : 1;
+      const eventSlow = eventState?.globalSlow || 1;
+      const dangerBoost = dangerMode ? FINAL_ALERT_SPEED_BOOST : 1;
+
+      meteors.forEach(m => {
+        m.x += m.vx * 2 * f * slow * eventSlow * dangerBoost;
+        m.y += m.vy * 2 * f * slow * eventSlow * dangerBoost;
+      });
+
       for (let i = meteors.length - 1; i >= 0; i--) {
-  const m = meteors[i];
+        const m = meteors[i];
 
-  // ✅ 修正：左右兩側出現時，不要「一出生就被當作離開畫面」刪掉
-  // 只有當隕石真的往左飛且超出左界，或往右飛且超出右界，才算漏掉
-  const outBottom = m.y > H + 60;
-  const outLeft   = (m.vx || 0) < 0 && m.x < -120;
-  const outRight  = (m.vx || 0) > 0 && m.x > W + 120;
+        // ✅ 修正：左右兩側出現時，不要「一出生就被當作離開畫面」刪掉
+        // 只有當隕石真的往左飛且超出左界，或往右飛且超出右界，才算漏掉
+        const outBottom = m.y > H + 60;
+        const outLeft   = (m.vx || 0) < 0 && m.x < -120;
+        const outRight  = (m.vx || 0) > 0 && m.x > W + 120;
 
-  if (outBottom || outLeft || outRight) {
-    meteors.splice(i, 1);
-    score = Math.max(0, score - 1);
-    wrong++;
-    combo = 0; // ✅ 沒打到也算斷連擊
-    comboEnergy = Math.max(0, comboEnergy - 18);
-    updateMissionProgress();
+        if (outBottom || outLeft || outRight) {
+          meteors.splice(i, 1);
+          score = Math.max(0, score - 1);
+          wrong++;
+          combo = 0; // ✅ 沒打到也算斷連擊
+          comboEnergy = Math.max(0, comboEnergy - 18);
+          updateMissionProgress();
 
-    // 🌍 隕石撞到地球：畫面閃爍 + 輕微震動
-    earthHits.push({ t0: performance.now(), life: 220 });
-    canvas.style.transform = `translate(${Math.random() < 0.5 ? -4 : 4}px, ${Math.random() < 0.5 ? -2 : 2}px)`;
-    setTimeout(() => { canvas.style.transform = ''; }, 90);
-  }
-}
+          // 🌍 隕石撞到地球：畫面閃爍 + 輕微震動
+          earthHits.push({ t0: now, life: 220 });
+          canvas.style.transform = `translate(${Math.random() < 0.5 ? -4 : 4}px, ${Math.random() < 0.5 ? -2 : 2}px)`;
+          setTimeout(() => { canvas.style.transform = ''; }, 90);
+        }
+      }
+
       draw();
+    } else {
+      // ✅ 關鍵修正：即使遊戲已停止，只要最終破關動畫還在播放，也必須持續重畫
+      if (finalVictory?.active) {
+        draw();
+      }
+
+      if (dangerMode) {
+        dangerMode = false;
+        setDangerUI();
+      }
     }
-    if (!running && dangerMode) {
-      dangerMode = false;
-      setDangerUI();
-    }
+
     requestAnimationFrame(step);
   }
 
