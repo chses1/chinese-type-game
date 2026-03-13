@@ -765,13 +765,18 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let classroomForcedEventId = '';
   let classroomForcedMissionId = '';
   let heartbeatTimer = null;
+  let heartbeatInFlight = false;
+  let classroomSyncInFlight = false;
 
   async function sendHeartbeat(status='online'){
-    if (!me.sid) return;
+    if (!me.sid || heartbeatInFlight) return;
+    heartbeatInFlight = true;
     try {
       await API.studentHeartbeat({ sid: me.sid, score, status, classroom: classroomMode });
     } catch (e) {
       console.warn('heartbeat fail', e);
+    } finally {
+      heartbeatInFlight = false;
     }
   }
 
@@ -779,7 +784,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     stopHeartbeat();
     heartbeatTimer = setInterval(() => {
       sendHeartbeat(running ? 'playing' : 'online');
-    }, 2000);
+    }, 4000);
     sendHeartbeat(running ? 'playing' : 'online');
   }
 
@@ -914,7 +919,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   }
 
   async function syncClassroomState(){
-    if (!me.sid) return;
+    if (!me.sid || classroomSyncInFlight) return;
+    classroomSyncInFlight = true;
     try {
       const resp = await API.classroomState();
       const s = resp.data || {};
@@ -1001,12 +1007,14 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       updatePauseButton();
     } catch (e) {
       console.warn('classroom sync fail', e);
+    } finally {
+      classroomSyncInFlight = false;
     }
   }
 
   function startClassroomPolling(){
     stopClassroomPolling();
-    classroomPollTimer = setInterval(syncClassroomState, 1000);
+    classroomPollTimer = setInterval(syncClassroomState, 2000);
     syncClassroomState();
   }
 

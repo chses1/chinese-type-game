@@ -3,6 +3,8 @@ const API_BASE = "/api";
 const $ = id => document.getElementById(id);
 const TOKEN_KEY = 'teacher-session-token';
 const ACTION_COOLDOWN_MS = 8000;
+const POLL_INTERVAL_MS = 5000;
+const CLASS_LIST_REFRESH_MS = 30000;
 
 const state = {
   classroom: null,
@@ -12,6 +14,7 @@ const state = {
   pollTimer: null,
   eventCooldownUntil: 0,
   missionCooldownUntil: 0,
+  lastClassesFetchAt: 0,
 };
 
 const toast = msg => {
@@ -50,7 +53,7 @@ async function jsonFetch(url, opts = {}) {
 const authHeaders = token => token ? { 'x-admin-session': token } : {};
 const API = {
   adminLogin(password){ return jsonFetch(`${API_BASE}/admin/login`, { method:'POST', body: JSON.stringify({ password }) }); },
-  getClasses(){ return jsonFetch(`${API_BASE}/classes`); },
+  getClasses(forceRefresh = false){ return jsonFetch(`${API_BASE}/classes${forceRefresh ? '?refresh=1' : ''}`); },
   leaderboard(limit = 10, classPrefix = '') {
     const qs = new URLSearchParams({ limit });
     if (classPrefix) qs.set('classPrefix', classPrefix);
@@ -308,14 +311,22 @@ async function loadAdminRealtime(){
   renderRankRows(state.liveRows);
 }
 
-async function refreshAll(){
-  const [classroomResp, classesResp] = await Promise.all([
-    API.classroomState(),
-    API.getClasses(),
-  ]);
+async function refreshAll({ forceClasses = false } = {}){
+  const shouldRefreshClasses = forceClasses || !state.lastClassesFetchAt || (Date.now() - state.lastClassesFetchAt >= CLASS_LIST_REFRESH_MS);
+
+  const classroomResp = await API.classroomState();
   state.classroom = classroomResp.data || null;
   if (state.classroom?.enabled && /^\d{3}$/.test(state.classroom.classPrefix || '')) syncClassInputs(state.classroom.classPrefix);
-  renderClassChips(classesResp.data || []);
+
+  if (shouldRefreshClasses) {
+    const classesResp = await API.getClasses(forceClasses);
+    state.classes = classesResp.data || [];
+    state.lastClassesFetchAt = Date.now();
+    renderClassChips(state.classes);
+  } else if (Array.isArray(state.classes)) {
+    renderClassChips(state.classes);
+  }
+
   await loadAdminRealtime();
   renderHud();
 }
@@ -364,7 +375,7 @@ async function clearClass(){
   if (!confirm(`確認清除 ${prefix} 班全部紀錄（含學號）？`)) return;
   await API.adminClearClass(prefix, token);
   toast(`已清除 ${prefix} 班資料`);
-  await refreshAll();
+  await refreshAll({ forceClasses:true });
   await loadClassRank();
 }
 
@@ -374,18 +385,18 @@ async function clearAll(){
   if (!confirm('確認清除全部學生紀錄（含學號）？')) return;
   await API.adminClearAll(token);
   toast('已清除全部學生紀錄');
-  await refreshAll();
+  await refreshAll({ forceClasses:true });
   renderClassRankRows([]);
 }
 
 function startPolling(){
   clearInterval(state.pollTimer);
-  state.pollTimer = setInterval(() => refreshAll().catch(err => console.warn(err)), 2000);
+  state.pollTimer = setInterval(() => refreshAll().catch(err => console.warn(err)), POLL_INTERVAL_MS);
 }
 
 function bindEvents(){
   document.querySelectorAll('.tabBtn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
-  $('btnRefreshOverview')?.addEventListener('click', () => refreshAll().then(() => toast('已重新整理')).catch(err => alert(err.message)));
+  $('btnRefreshOverview')?.addEventListener('click', () => refreshAll({ forceClasses:true }).then(() => toast('已重新整理')).catch(err => alert(err.message)));
   $('btnLoadClasses')?.addEventListener('click', () => loadClasses().then(() => toast('已載入班級清單')).catch(err => alert(err.message)));
   $('btnShowAll')?.addEventListener('click', () => loadAllRank().catch(err => alert(err.message)));
   $('btnLoadClassRank')?.addEventListener('click', () => loadClassRank().catch(err => alert(err.message)));
@@ -415,7 +426,7 @@ function bindEvents(){
       setToken(resp?.data?.sessionToken || '');
       if ($('lockPass')) $('lockPass').value = '';
       hideLock();
-      await refreshAll();
+      await refreshAll({ forceClasses:true });
       startPolling();
       toast('已解鎖');
     } catch {
