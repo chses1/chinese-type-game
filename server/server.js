@@ -436,6 +436,26 @@ app.post("/api/admin/clear-all", adminAuth, async (req, res) => {
   }
 });
 
+
+// 刪除個別學生成績（刪除整筆學生資料）
+app.post("/api/admin/delete-student", adminAuth, async (req, res) => {
+  if (!requireDB(res)) return;
+  const sid = String(req.body?.sid || "").trim();
+  if (!/^\d{5}$/.test(sid)) {
+    return res.status(400).json({ ok:false, error:"sid_invalid", got:sid });
+  }
+  try {
+    const result = await students.deleteOne({ sid });
+    invalidateClassesCache();
+    if (!result.deletedCount) {
+      return res.status(404).json({ ok:false, error:"student_not_found", sid });
+    }
+    res.json({ ok:true, data:{ sid } });
+  } catch (e) {
+    res.status(500).json({ ok:false, error:e.message });
+  }
+});
+
 const ALLOWED_CLASSROOM_EVENTS = new Set(["meteorShower", "iceWind", "goldRush", "bossWave"]);
 const ALLOWED_CLASSROOM_MISSIONS = new Set(["goldHunter", "iceBreaker", "comboMaster", "quickShot", "bossBreaker", "random"]);
 

@@ -465,8 +465,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
         guaranteedType:'gold', extraSpawnTotal:1, maxConcurrent:6
       },
       {
-        id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場減速 10 秒並持續顯示寒流邊框',
-        durationMs: EVENT_DURATION_MS, globalSlow:0.84, iceBonus:0.08,
+        id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場所有隕石減速 50%，並持續顯示寒流邊框',
+        durationMs: EVENT_DURATION_MS, globalSlow:0.5, iceBonus:0.08,
         guaranteedType:'ice', extraSpawnTotal:1, maxConcurrent:6, persistentGlow:true
       }
     ];

@@ -77,6 +77,9 @@ const API = {
   adminClearAll(token){
     return jsonFetch(`${API_BASE}/admin/clear-all`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ mode:'delete' }) });
   },
+  adminDeleteStudent(sid, token){
+    return jsonFetch(`${API_BASE}/admin/delete-student`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ sid }) });
+  },
   classroomOpen(classPrefix, token){
     return jsonFetch(`${API_BASE}/admin/classroom/open`, { method:'POST', headers: authHeaders(token), body: JSON.stringify({ classPrefix }) });
   },
@@ -219,7 +222,7 @@ function renderClassRankRows(rows){
   const body = $('teacherLbBody');
   if (!body) return;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="3">目前沒有排行榜資料</td></tr>';
+    body.innerHTML = '<tr><td colspan="4">目前沒有排行榜資料</td></tr>';
     return;
   }
   body.innerHTML = rows.map((r, i) => `
@@ -227,7 +230,12 @@ function renderClassRankRows(rows){
       <td>${i+1}</td>
       <td>${r.sid}</td>
       <td>${Number(r.best || 0)}</td>
+      <td><button class="ghost btnDeleteStudent" data-sid="${r.sid}">刪除</button></td>
     </tr>`).join('');
+
+  body.querySelectorAll('.btnDeleteStudent').forEach(btn => {
+    btn.addEventListener('click', () => deleteStudent(btn.dataset.sid).catch(err => alert(err.message)));
+  });
 }
 
 function renderClassChips(classes = []){
@@ -387,6 +395,19 @@ async function clearAll(){
   toast('已清除全部學生紀錄');
   await refreshAll({ forceClasses:true });
   renderClassRankRows([]);
+}
+
+
+async function deleteStudent(sid){
+  const token = getToken();
+  if (!token) return alert('請先輸入教師密碼');
+  if (!/^\d{5}$/.test(String(sid || '').trim())) return alert('學生學號格式錯誤');
+  if (!confirm(`確認刪除學生 ${sid} 的成績資料？此動作無法復原。`)) return;
+  await API.adminDeleteStudent(String(sid).trim(), token);
+  toast(`已刪除 ${sid} 的成績`);
+  await refreshAll({ forceClasses:true });
+  const selectedPrefix = ($('classPrefix')?.value || '').trim();
+  if (/^\d{3}$/.test(selectedPrefix)) await loadClassRank();
 }
 
 function startPolling(){
