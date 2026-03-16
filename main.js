@@ -460,9 +460,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
         guaranteedType:'normal', extraSpawnTotal:4, maxConcurrent:8, extraSpeedMul:1.22
       },
       {
-        id:'goldRush', icon:'✨', label:'黃金時刻', desc:'黃金隕石機率提升至 25%',
-        durationMs: EVENT_DURATION_MS, goldChanceOverride:0.25, bossPenalty:0.01,
-        guaranteedType:'gold', extraSpawnTotal:1, maxConcurrent:6
+        id:'goldRush', icon:'✨', label:'黃金時刻', desc:'黃金隕石大量出現，速度提升',
+        durationMs: EVENT_DURATION_MS, goldChanceOverride:0.4, bossPenalty:0.02,
+        guaranteedType:'gold', extraSpawnTotal:2, maxConcurrent:5,
+        extraSpeedMul:1.18, spawnMul:0.9
       },
       {
         id:'iceWind', icon:'🧊', label:'冰風暴', desc:'全場所有隕石減速 50%，並持續顯示寒流邊框',
@@ -512,6 +513,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       eventSpacingMs
     };
     eventExtraSpawnTimer = 0;
+
+    if (picked.id === 'goldRush' && spawnMeteor('gold', null, { speedMul: picked.extraSpeedMul || 1 })) {
+      activeEvent.extraSpawned = 1;
+    }
 
     // 事件顯示統一交給上方常駐狀態列，避免同時跳出多個重複提示
   }
@@ -1176,7 +1181,7 @@ function spawnMeteor(forceType = null, forceLabel = null, options = {}){
   const dy = targetY - startY;
   const len = Math.hypot(dx, dy) || 1;
 
-  const speedMap = { normal:2.2, gold:2.45, ice:2.0, boss:1.95 };
+  const speedMap = { normal:2.2, gold:2.75, ice:2.0, boss:1.95 };
   const typeSpeed = (speedMap[type] || speedMap.normal) * (Number(options.speedMul) || 1);
 
   const vx = (dx / len) * typeSpeed;
