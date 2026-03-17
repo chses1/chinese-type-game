@@ -2472,24 +2472,46 @@ async function endAndShowLeader(){
   $('teacherOpen') && ($('teacherOpen').onclick = () => { /* 預設超連結就會導去 /teacher */ });
 
   // 實體鍵盤
-  addEventListener('keydown',e=>{
-    // Shift + 數字：快速跳關（Shift+0 = 第10關）
+  addEventListener('keydown', e => {
+    // Shift + 1~0 = 第 1~10 關
+    // Shift + Q~P = 第 11~20 關
     if (e.shiftKey) {
-      if (/^[1-9]$/.test(e.key)) {
+      const jumpMap = {
+        '1': 1,
+        '2': 2,
+        '3': 3,
+        '4': 4,
+        '5': 5,
+        '6': 6,
+        '7': 7,
+        '8': 8,
+        '9': 9,
+        '0': 10,
+        'Q': 11,
+        'W': 12,
+        'E': 13,
+        'R': 14,
+        'T': 15,
+        'Y': 16,
+        'U': 17,
+        'I': 18,
+        'O': 19,
+        'P': 20
+      };
+
+      const key = String(e.key || '').toUpperCase();
+      const targetLevel = jumpMap[key];
+
+      if (targetLevel) {
         e.preventDefault();
-        jumpToLevel(Number(e.key));
-        return;
-      }
-      if (e.key === '0') {
-        e.preventDefault();
-        jumpToLevel(10);
+        jumpToLevel(targetLevel);
         return;
       }
     }
 
-    if(e.key===' '){ e.preventDefault(); toggleRun(); return; }
-    if(e.key==='Escape'){ pauseGame(); return; }
-    if(ZHUYIN.includes(e.key)){ pressKey(e.key); }
+    if (e.key === ' ') { e.preventDefault(); toggleRun(); return; }
+    if (e.key === 'Escape') { pauseGame(); return; }
+    if (ZHUYIN.includes(e.key)) { pressKey(e.key); }
   });
 
   // 初始化
