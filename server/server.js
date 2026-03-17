@@ -170,7 +170,7 @@ app.post("/api/upsert-student", async (req, res) => {
   const now = new Date();
   await students.updateOne(
     { sid: String(sid) },
-    { $setOnInsert: { best: 0, createdAt: now }, $set: { name, updatedAt: now } },
+    { $setOnInsert: { best: 0, bestLevel: 0, createdAt: now }, $set: { name, updatedAt: now } },
     { upsert: true }
   );
   invalidateClassesCache();
@@ -180,18 +180,31 @@ app.post("/api/upsert-student", async (req, res) => {
 
 app.post("/api/update-best", async (req, res) => {
   if (!requireDB(res)) return;
-  const { sid, score } = req.body || {};
+  const { sid, score, level = 0 } = req.body || {};
   if (!/^\d{5}$/.test(String(sid)) || typeof score !== "number") {
     return res.status(400).json({ ok: false, error: "bad_request" });
   }
+  const numericScore = Number(score || 0);
+  const numericLevel = Math.max(0, Number(level || 0));
   const doc  = await students.findOne({ sid: String(sid) });
-  const best = Math.max(Number(doc?.best || 0), Number(score || 0));
+  const prevBest = Number(doc?.best || 0);
+  const prevBestLevel = Number(doc?.bestLevel || 0);
+
+  let nextBest = prevBest;
+  let nextBestLevel = prevBestLevel;
+  if (numericScore > prevBest) {
+    nextBest = numericScore;
+    nextBestLevel = numericLevel;
+  } else if (numericScore === prevBest && numericScore > 0 && numericLevel > prevBestLevel) {
+    nextBestLevel = numericLevel;
+  }
+
   await students.updateOne(
     { sid: String(sid) },
-    { $set: { best, updatedAt: new Date() } }
+    { $set: { best: nextBest, bestLevel: nextBestLevel, updatedAt: new Date() } }
   );
   invalidateClassesCache();
-  res.json({ ok: true, data: { sid: String(sid), best } });
+  res.json({ ok: true, data: { sid: String(sid), best: nextBest, bestLevel: nextBestLevel } });
 });
 
 // 排行榜（支援班級過濾：?limit=50&classPrefix=301）
@@ -203,7 +216,7 @@ app.get("/api/leaderboard", async (req, res) => {
   if (/^\d{3}$/.test(classPrefix)) filter.sid = new RegExp("^" + classPrefix);
 
   const list  = await students
-    .find(filter, { projection: { _id: 0, sid: 1, name: 1, best: 1 } })
+    .find(filter, { projection: { _id: 0, sid: 1, name: 1, best: 1, bestLevel: 1 } })
     .sort({ best: -1, updatedAt: -1 })
     .limit(limit)
     .toArray();
@@ -218,7 +231,7 @@ app.post("/api/student/heartbeat", heartbeatRateLimit, async (req, res) => {
   await students.updateOne(
     { sid: String(sid) },
     {
-      $setOnInsert: { best: 0, createdAt: now },
+      $setOnInsert: { best: 0, bestLevel: 0, createdAt: now },
       $set: {
         lastSeenAt: now,
         currentScore: Number(score || 0),
@@ -237,8 +250,8 @@ app.get("/api/student/:sid", async (req, res) => {
   if (!requireDB(res)) return;
   const sid = req.params.sid;
   if (!/^\d{5}$/.test(sid)) return res.status(400).json({ ok: false, error: "sid_invalid" });
-  const doc = await students.findOne({ sid }, { projection: { _id: 0, sid: 1, best: 1 } });
-  res.json({ ok: true, data: { sid, best: Number(doc?.best || 0) } });
+  const doc = await students.findOne({ sid }, { projection: { _id: 0, sid: 1, best: 1, bestLevel: 1 } });
+  res.json({ ok: true, data: { sid, best: Number(doc?.best || 0), bestLevel: Number(doc?.bestLevel || 0) } });
 });
 
 // 班級統計

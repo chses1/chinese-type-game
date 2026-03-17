@@ -273,6 +273,24 @@ header .chip span {
 .resultMissionChip.done{ border-color:rgba(110,245,160,.28); background:rgba(46,204,113,.10); }
 .resultMissionChip.todo{ border-color:rgba(255,213,74,.18); }
 .resultActionBtn{ margin-top:10px; min-height:48px; font-size:18px; }
+
+@media (max-width: 760px){
+  .leaderTitleRow{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .leaderTitleSide{
+    min-width:0;
+    width:100%;
+  }
+  .leaderModeSwitch{
+    width:100%;
+  }
+  .leaderModeSwitch .tag{
+    flex:1 1 0;
+    min-width:0;
+  }
+}
 /* login */
 #login{
   position:fixed;
@@ -498,11 +516,20 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
 }
 .leaderTitleRow{
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:space-between;
   gap:12px;
   margin-bottom:12px;
 }
+.leaderTitleMain{
+  min-width:0;
+  flex:1 1 auto;
+}
+.leaderTitleSide{
+  flex:0 0 auto;
+  min-width:220px;
+}
+
 .leaderTitleRow h2{
   margin:0;
   color:#ffe16a;
@@ -517,8 +544,14 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   margin-top:8px;
   display:flex;
   gap:8px;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
+  align-items:center;
 }
+.leaderModeSwitch .tag{
+  flex:0 0 auto;
+  min-width:140px;
+}
+
 .leaderModeSwitch .tag.active{
   background:linear-gradient(180deg,#ffe27a,#ffbf3c);
   color:#182642;

@@ -54,7 +54,7 @@ const authHeaders = token => token ? { 'x-admin-session': token } : {};
 const API = {
   adminLogin(password){ return jsonFetch(`${API_BASE}/admin/login`, { method:'POST', body: JSON.stringify({ password }) }); },
   getClasses(forceRefresh = false){ return jsonFetch(`${API_BASE}/classes${forceRefresh ? '?refresh=1' : ''}`); },
-  leaderboard(limit = 10, classPrefix = '') {
+  leaderboard(limit = 500, classPrefix = '') {
     const qs = new URLSearchParams({ limit });
     if (classPrefix) qs.set('classPrefix', classPrefix);
     return jsonFetch(`${API_BASE}/leaderboard?${qs.toString()}`);
@@ -222,7 +222,7 @@ function renderClassRankRows(rows){
   const body = $('teacherLbBody');
   if (!body) return;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="4">目前沒有排行榜資料</td></tr>';
+    body.innerHTML = '<tr><td colspan="5">目前沒有排行榜資料</td></tr>';
     return;
   }
   body.innerHTML = rows.map((r, i) => `
@@ -230,6 +230,7 @@ function renderClassRankRows(rows){
       <td>${i+1}</td>
       <td>${r.sid}</td>
       <td>${Number(r.best || 0)}</td>
+      <td>${Number(r.bestLevel || 0) > 0 ? `第 ${Number(r.bestLevel)} 關` : '—'}</td>
       <td><button class="ghost btnDeleteStudent" data-sid="${r.sid}">刪除</button></td>
     </tr>`).join('');
 
@@ -293,14 +294,12 @@ async function loadClasses(){
 async function loadClassRank(){
   const prefix = ($('classPrefix')?.value || '').trim();
   if (!/^\d{3}$/.test(prefix)) return alert('請輸入正確的班級前三碼');
-  const limit = Number(($('lbLimit')?.value) || 10);
-  const resp = await API.leaderboard(limit, prefix);
+  const resp = await API.leaderboard(500, prefix);
   renderClassRankRows(resp.data || []);
 }
 
 async function loadAllRank(){
-  const limit = Number(($('lbLimit')?.value) || 10);
-  const resp = await API.leaderboard(limit);
+  const resp = await API.leaderboard(500);
   renderClassRankRows(resp.data || []);
 }
 

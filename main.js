@@ -1035,8 +1035,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     if (!b || !me.sid) return;
     try { const r = await API.getStudent(me.sid); if (r.ok) b.textContent = r.data.best; } catch{}
   }
-  async function submitBest(sid, score){
-    try { await API.updateBest({ sid, score }); } catch(e){ console.warn('submitBest fail', e); }
+  async function submitBest(sid, score, levelReached = level){
+    try { await API.updateBest({ sid, score, level: levelReached }); } catch(e){ console.warn('submitBest fail', e); }
   }
 // 🔑 記錄每個注音鍵在 canvas 中對應的位置
 const keyPositions = {};
@@ -2011,7 +2011,7 @@ async function endAndShowLeader(){
   clearInterval(timerId);
 
   // 結束時也送出 best（避免學生按結束就沒記到）
-  try { await submitBest(me.sid, score); } catch {}
+  try { await submitBest(me.sid, score, level); } catch {}
   await setBest();
 
   // 不顯示「打字結果」彈窗，直接看排行榜
@@ -2164,7 +2164,7 @@ async function endAndShowLeader(){
     if (classroomMode) {
       showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
       try {
-        if (me.sid) await submitBest(me.sid, score);
+        if (me.sid) await submitBest(me.sid, score, level);
         await setBest();
       } catch (e) {
         console.warn('endGame submit/setBest fail', e);
@@ -2203,7 +2203,7 @@ async function endAndShowLeader(){
         }
 
         try {
-          if (me.sid) await submitBest(me.sid, score);
+          if (me.sid) await submitBest(me.sid, score, level);
           await setBest();
         } catch (e) {
           console.warn('final clear submit/setBest fail', e);
@@ -2228,7 +2228,7 @@ async function endAndShowLeader(){
     setLives();
 
     try {
-      if (me.sid) await submitBest(me.sid, score);
+      if (me.sid) await submitBest(me.sid, score, level);
       await setBest();
     } catch (e) {
       console.warn('endGame submit/setBest fail', e);
@@ -2300,8 +2300,9 @@ async function endAndShowLeader(){
       tb.innerHTML = list.map((r,i)=>{
         const rank = i + 1;
         const isMe = String(r.sid) === String(me.sid || '');
-        return `<tr class="${isMe ? 'me' : ''}"><td>${rank}</td><td>${r.sid}${isMe ? '（你）' : ''}</td><td>${r.best}</td></tr>`;
-      }).join('') || `<tr><td colspan="3">目前沒有排行榜資料</td></tr>`;
+        const bestLevel = Number(r.bestLevel || 0) > 0 ? `第 ${Number(r.bestLevel)} 關` : '—';
+        return `<tr class="${isMe ? 'me' : ''}"><td>${rank}</td><td>${r.sid}${isMe ? '（你）' : ''}</td><td>${r.best}</td><td>${bestLevel}</td></tr>`;
+      }).join('') || `<tr><td colspan="4">目前沒有排行榜資料</td></tr>`;
 
       if (meta) {
         if (mode === 'class' && !isClassMode) meta.textContent = '找不到班級資料，已改顯示全部排行';
@@ -2322,7 +2323,7 @@ async function endAndShowLeader(){
     } catch (e) {
       if (title) title.textContent = '排行榜';
       if (meta) meta.textContent = '排行榜載入失敗';
-      tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="4">讀取失敗：${e.message}</td></tr>`;
     }
   }
 
