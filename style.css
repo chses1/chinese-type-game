@@ -526,8 +526,9 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   flex:1 1 auto;
 }
 .leaderTitleSide{
-  flex:0 0 auto;
-  min-width:220px;
+  flex:0 1 220px;
+  min-width:160px;
+  max-width:220px;
 }
 
 .leaderTitleRow h2{
@@ -544,12 +545,21 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   margin-top:8px;
   display:flex;
   gap:8px;
-  flex-wrap:nowrap;
-  align-items:center;
+  width:100%;
+  align-items:stretch;
 }
+
 .leaderModeSwitch .tag{
-  flex:0 0 auto;
-  min-width:140px;
+  flex:1 1 0;
+  min-width:0;
+  width:auto;
+  padding:10px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
 .leaderModeSwitch .tag.active{
