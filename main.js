@@ -142,8 +142,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2 }
   ];
   const LEVEL_NAMES = [
-    '新兵試煉','近地軌道防線','流星攔截戰','冰封空域','黃金突襲','雙星危機','極速防衛網','重力亂流區','終極警戒線','地球最終決戰',
-    '進階衝刺區','高速碎星帶','雷霆反應場','超頻追擊戰','極限流星陣','黑夜壓力測試','星環崩解區','超新星防衛線','銀河終端戰','傳奇守護者試煉'
+    '新兵報到','基礎定位','注音校準','反應熱身','軌道模擬','冰凍演練','黃金特訓','雙線攔截','高速測考','模擬總測驗',
+    '近地警報','防衛啟動','流星攔截線','冰風防衛區','黃金突襲戰','Boss 壓力區','重力亂流帶','星環防衛線','末日倒數','最終決戰'
   ];
   const BEGINNER_TRIAL_CLEAR_LEVEL = 10;
   const getLevelCfg = () => LEVELS[level - 1] || LEVELS.at(-1);
@@ -343,7 +343,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     ctx.shadowBlur = 0;
     ctx.font = `bold ${Math.max(20, Math.min(32, W * 0.018))}px system-ui`;
     ctx.fillStyle = 'rgba(225, 242, 255, 0.96)';
-    ctx.fillText('第 10 關最終任務完成，敵軍已撤退', cx, titleY + 54);
+        ctx.fillText('第 20 關最終任務完成，地球防衛作戰勝利', cx, titleY + 54);
 
     if (t >= 2100) {
       const cardW = Math.min(720, W * 0.78);
