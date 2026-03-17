@@ -129,11 +129,23 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     { lpm:15, duration:60, speedMul:1.18, bossChance:0.05, goldChance:0.10, iceChance:0.10, finalBossChance:0.22, finalExtraBoss:2, eventCount:2 },
     { lpm:16, duration:60, speedMul:1.21, bossChance:0.05, goldChance:0.09, iceChance:0.10, finalBossChance:0.23, finalExtraBoss:2, eventCount:2 },
     { lpm:17, duration:60, speedMul:1.24, bossChance:0.06, goldChance:0.09, iceChance:0.09, finalBossChance:0.24, finalExtraBoss:2, eventCount:2 },
-    { lpm:18, duration:60, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2 }
+    { lpm:18, duration:60, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2 },
+    { lpm:20, duration:60, speedMul:1.38, bossChance:0.07, goldChance:0.08, iceChance:0.08, finalBossChance:0.27, finalExtraBoss:2, eventCount:2 },
+    { lpm:22, duration:60, speedMul:1.50, bossChance:0.08, goldChance:0.08, iceChance:0.08, finalBossChance:0.29, finalExtraBoss:2, eventCount:2 },
+    { lpm:24, duration:60, speedMul:1.63, bossChance:0.09, goldChance:0.07, iceChance:0.08, finalBossChance:0.31, finalExtraBoss:3, eventCount:2 },
+    { lpm:26, duration:60, speedMul:1.77, bossChance:0.10, goldChance:0.07, iceChance:0.07, finalBossChance:0.33, finalExtraBoss:3, eventCount:2 },
+    { lpm:28, duration:60, speedMul:1.92, bossChance:0.11, goldChance:0.06, iceChance:0.07, finalBossChance:0.35, finalExtraBoss:3, eventCount:2 },
+    { lpm:30, duration:60, speedMul:2.08, bossChance:0.12, goldChance:0.06, iceChance:0.06, finalBossChance:0.37, finalExtraBoss:3, eventCount:2 },
+    { lpm:32, duration:60, speedMul:2.25, bossChance:0.13, goldChance:0.06, iceChance:0.06, finalBossChance:0.39, finalExtraBoss:4, eventCount:2 },
+    { lpm:34, duration:60, speedMul:2.43, bossChance:0.14, goldChance:0.05, iceChance:0.06, finalBossChance:0.41, finalExtraBoss:4, eventCount:2 },
+    { lpm:36, duration:60, speedMul:2.62, bossChance:0.15, goldChance:0.05, iceChance:0.05, finalBossChance:0.43, finalExtraBoss:4, eventCount:2 },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2 }
   ];
   const LEVEL_NAMES = [
-    '新兵試煉','近地軌道防線','流星攔截戰','冰封空域','黃金突襲','雙星危機','極速防衛網','重力亂流區','終極警戒線','地球最終決戰'
+    '新兵試煉','近地軌道防線','流星攔截戰','冰封空域','黃金突襲','雙星危機','極速防衛網','重力亂流區','終極警戒線','地球最終決戰',
+    '進階衝刺區','高速碎星帶','雷霆反應場','超頻追擊戰','極限流星陣','黑夜壓力測試','星環崩解區','超新星防衛線','銀河終端戰','傳奇守護者試煉'
   ];
+  const BEGINNER_TRIAL_CLEAR_LEVEL = 10;
   const getLevelCfg = () => LEVELS[level - 1] || LEVELS.at(-1);
   const spawnInterval = () => Math.max(320, Math.round(60000 / getLevelCfg().lpm));
   const levelFallFactor = () => getLevelCfg().speedMul;
@@ -2064,7 +2076,24 @@ async function endAndShowLeader(){
     return `⚠️ 防線仍有缺口，再提升約 ${needPct}% 命中率就能過關`;
   }
 
-  function showResult({correct, wrong, acc, speed, passed, livesLeft = lives, gameOver = false}){
+  function showResult({
+    correct,
+    wrong,
+    acc,
+    speed,
+    passed,
+    livesLeft = lives,
+    gameOver = false,
+    titleOverride = '',
+    titleDescOverride = '',
+    progressTextOverride = '',
+    outcomeTextOverride = '',
+    promoTextOverride = '',
+    primaryText = '',
+    primaryAction = null,
+    primaryDisabled = null,
+    themeOverride = ''
+  }){
     const accPct = Math.round(acc * 100);
     const shieldPct = Math.max(8, Math.min(100, accPct));
     const grade = getBattleGrade(acc);
@@ -2076,16 +2105,18 @@ async function endAndShowLeader(){
     if ($('resAcc'))     $('resAcc').textContent     = accPct + '%';
     if ($('resSpeed'))   $('resSpeed').textContent   = Math.round(speed);
     if ($('resGrade'))   $('resGrade').textContent   = grade;
-    if ($('resTitle'))   $('resTitle').textContent   = titleData.title;
-    if ($('resTitleDesc')) $('resTitleDesc').textContent = titleData.desc;
-    if ($('resProgressText')) $('resProgressText').textContent = titleData.next;
-    if ($('resultOutcome')) $('resultOutcome').textContent = buildResultOutcomeText({ passed, gameOver, livesLeft, acc });
+    if ($('resTitle'))   $('resTitle').textContent   = titleOverride || titleData.title;
+    if ($('resTitleDesc')) $('resTitleDesc').textContent = titleDescOverride || titleData.desc;
+    if ($('resProgressText')) $('resProgressText').textContent = progressTextOverride || titleData.next;
+    if ($('resultOutcome')) $('resultOutcome').textContent = outcomeTextOverride || buildResultOutcomeText({ passed, gameOver, livesLeft, acc });
     if ($('resShield')) $('resShield').textContent = shieldPct + '%';
     if ($('resShieldFill')) $('resShieldFill').style.width = shieldPct + '%';
 
     const promoEl = $('resPromo');
     if (promoEl) {
-      if (gameOver) {
+      if (promoTextOverride) {
+        promoEl.textContent = promoTextOverride;
+      } else if (gameOver) {
         promoEl.textContent = '💀 地球遭到重創，本次作戰已結束。';
       } else if (passed) {
         promoEl.textContent = `✅ 本關達標，成功守住地球防線！（升級門檻 ${Math.round(ACC_THRESHOLD * 100)}%）`;
@@ -2108,7 +2139,10 @@ async function endAndShowLeader(){
     const card = $('resultCard');
     if (card) {
       card.classList.remove('resultThemePass', 'resultThemeFail', 'resultThemeLegend');
-      if (acc >= 0.95) card.classList.add('resultThemeLegend');
+      if (themeOverride === 'legend') card.classList.add('resultThemeLegend');
+      else if (themeOverride === 'pass') card.classList.add('resultThemePass');
+      else if (themeOverride === 'fail') card.classList.add('resultThemeFail');
+      else if (acc >= 0.95) card.classList.add('resultThemeLegend');
       else if (passed) card.classList.add('resultThemePass');
       else card.classList.add('resultThemeFail');
     }
@@ -2121,6 +2155,12 @@ async function endAndShowLeader(){
       if (classroomMode) {
         freshBtn.textContent = '等待老師下一回合';
         freshBtn.disabled = true;
+      } else if (primaryText) {
+        freshBtn.textContent = primaryText;
+        freshBtn.disabled = primaryDisabled === true;
+        if (typeof primaryAction === 'function' && !freshBtn.disabled) {
+          freshBtn.onclick = primaryAction;
+        }
       } else if (gameOver) {
         freshBtn.textContent = '查看排行榜';
         freshBtn.disabled = true;
@@ -2182,7 +2222,9 @@ async function endAndShowLeader(){
     }
 
     if (passed) {
-      const clearedFinalLevel = level >= LEVELS.length;
+      const clearedLevel = level;
+      const clearedFinalLevel = clearedLevel >= LEVELS.length;
+      const completedBeginnerTrial = clearedLevel === BEGINNER_TRIAL_CLEAR_LEVEL;
       if (!clearedFinalLevel) {
         level++;
       }
@@ -2214,7 +2256,33 @@ async function endAndShowLeader(){
       }
 
       toast && toast(`🛡️ 過關成功，目前接關次數 ${lives}/${MAX_LIVES}`);
-      showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
+
+      if (completedBeginnerTrial) {
+        showResult({
+          correct,
+          wrong,
+          acc,
+          speed,
+          passed,
+          livesLeft: lives,
+          gameOver: false,
+          titleOverride: '🎓 新手試煉完成',
+          titleDescOverride: '你已完成前 10 關模擬測試，準備進入進階高速防衛訓練。',
+          progressTextOverride: '下一階段將從第 11 關開始，隕石速度會明顯提升。',
+          outcomeTextOverride: `✅ 已完成第 ${clearedLevel} 關模擬測試，保留 ${lives}/${MAX_LIVES} 次接關機會`,
+          promoTextOverride: '🏅 階段獎勵：完成新手試煉！接下來將進入進階版 11～20 關。',
+          primaryText: '⚡ 進入第 11 關進階訓練',
+          primaryAction: () => {
+            closeResult();
+            gameEnded = false;
+            resetRoundState({ keepExisting:true });
+            startGame();
+          },
+          themeOverride: 'legend'
+        });
+      } else {
+        showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
+      }
     } else {
       lives = Math.max(0, lives - 1);
       if (lives > 0) {
