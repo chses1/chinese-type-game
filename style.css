@@ -513,6 +513,18 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   color:rgba(238,245,255,.76);
   text-align:right;
 }
+.leaderModeSwitch{
+  margin-top:8px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.leaderModeSwitch .tag.active{
+  background:linear-gradient(180deg,#ffe27a,#ffbf3c);
+  color:#182642;
+  border-color:rgba(255,213,74,.9);
+  box-shadow:0 0 0 1px rgba(255,213,74,.22), 0 8px 22px rgba(255,191,60,.18);
+}
 .leaderTableWrap{
   max-height:min(56dvh,460px);
   overflow:auto;

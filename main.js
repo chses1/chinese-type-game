@@ -755,6 +755,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const SLOW_MS = 5000;       // 慢動作持續時間（延長為 5 秒）
   const SLOW_FACTOR = 0.45;   // 速度倍率（0.45 = 變慢）
   let me={sid:null,name:''};
+  let leaderMode = 'class';
   let teacherToken="";
 
   // ===== 教室競賽模式 =====
@@ -2271,24 +2272,30 @@ async function endAndShowLeader(){
     draw();
   }
 
-  // 排行榜（教師按鈕在遊戲頁也可用）
-  async function openLeader() {
-    const closeBtn = $('btnCloseLeader');
-    if (closeBtn) closeBtn.textContent = '結束';
+  function setLeaderModeButtons(mode='class'){
+    $('btnClassLeader')?.classList.toggle('active', mode === 'class');
+    $('btnGlobalLeader')?.classList.toggle('active', mode === 'global');
+  }
 
+  async function renderLeader(mode = 'class') {
     const tb = $('leaderBody');
     const meta = $('leaderMeta');
-    const panel = $('leader');
-    if (!tb || !panel) return;
+    const title = $('leaderTitle');
+    if (!tb) return;
 
-    panel.removeAttribute('hidden');
-    panel.classList.add('show');
-    panel.style.display = 'flex';
+    const classPrefix = me.sid ? String(me.sid).slice(0, 3) : '';
+    const isClassMode = mode === 'class' && /^\d{3}$/.test(classPrefix);
+    const finalMode = isClassMode ? 'class' : 'global';
+    setLeaderModeButtons(finalMode);
 
     try {
-      const data = await API.leaderboard(500);
+      const data = await API.leaderboard(500, isClassMode ? classPrefix : '');
       const list = Array.isArray(data.data) ? data.data : [];
       const myIndex = list.findIndex(r => String(r.sid) === String(me.sid || ''));
+
+      if (title) {
+        title.textContent = isClassMode ? `本班排行榜（${classPrefix}）` : '全部排行榜';
+      }
 
       tb.innerHTML = list.map((r,i)=>{
         const rank = i + 1;
@@ -2297,7 +2304,8 @@ async function endAndShowLeader(){
       }).join('') || `<tr><td colspan="3">目前沒有排行榜資料</td></tr>`;
 
       if (meta) {
-        if (myIndex >= 0) meta.textContent = `已反白你的名次，並自動捲到第 ${myIndex+1} 名附近`;
+        if (mode === 'class' && !isClassMode) meta.textContent = '找不到班級資料，已改顯示全部排行';
+        else if (myIndex >= 0) meta.textContent = `已反白你的名次，並自動捲到第 ${myIndex+1} 名附近`;
         else meta.textContent = `目前共 ${list.length} 人`;
       }
 
@@ -2312,9 +2320,26 @@ async function endAndShowLeader(){
         }
       });
     } catch (e) {
+      if (title) title.textContent = '排行榜';
       if (meta) meta.textContent = '排行榜載入失敗';
       tb.innerHTML = `<tr><td colspan="3">讀取失敗：${e.message}</td></tr>`;
     }
+  }
+
+  // 排行榜（教師按鈕在遊戲頁也可用）
+  async function openLeader() {
+    const closeBtn = $('btnCloseLeader');
+    if (closeBtn) closeBtn.textContent = '結束';
+
+    const panel = $('leader');
+    if (!panel) return;
+
+    panel.removeAttribute('hidden');
+    panel.classList.add('show');
+    panel.style.display = 'flex';
+
+    leaderMode = 'class';
+    await renderLeader(leaderMode);
   }
   function closeLeader(){ 
     const p=$('leader'); 
@@ -2352,6 +2377,8 @@ async function endAndShowLeader(){
 
   // 綁定 UI（存在才綁）
   // 舊版按鈕綁定已移除，避免和目前介面殘留結構混用
+  $('btnClassLeader')  && ($('btnClassLeader').onclick=async()=>{ leaderMode='class'; await renderLeader('class'); });
+  $('btnGlobalLeader') && ($('btnGlobalLeader').onclick=async()=>{ leaderMode='global'; await renderLeader('global'); });
   $('btnCloseLeader')  && ($('btnCloseLeader').onclick=logoutToInitialScreen);
   $('btnRestartGame')  && ($('btnRestartGame').onclick=()=>{ closeLeader(); restart(); });
 
