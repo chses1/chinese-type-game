@@ -35,6 +35,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const $ = id => document.getElementById(id);
   const toast = msg => { const t=$('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),900); };
 
+  // ===== 防止 iPad Safari 連點／手勢縮放 =====
+  let lastTouchEnd = 0;
+
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd < 300) {
+      e.preventDefault();
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  document.addEventListener('gesturestart', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('gesturechange', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('gestureend', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+
   // 若頁面沒有遊戲畫面（如 teacher.html），直接略過以下初始化
   const canvas = $('gameCanvas');
   if (!canvas) return;
@@ -1137,6 +1164,7 @@ const keyPositions = {};
       }
 
       b.dataset.key = ch;
+      b.setAttribute('type', 'button');
       row.appendChild(b);
     });
     kbd.appendChild(row);

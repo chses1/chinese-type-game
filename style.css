@@ -1,6 +1,20 @@
 :root{--bg:#081a3a;--accent:#ffd54a;--good:#2ecc71;--bad:#ff6b6b;--panel:#0f274f;--text:#eef5ff}
 *{box-sizing:border-box;font-family:system-ui,-apple-system,"Noto Sans TC",Arial}
 body{margin:0;overflow:hidden;background:radial-gradient(1200px 600px at 50% 110%,#0a2a5e,#050e22) fixed;color:var(--text)}
+
+html, body {
+  touch-action: manipulation;
+}
+
+#gameWrap,
+#gameCanvas,
+#kbd,
+#kbd .key {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 header {
   position:fixed;
   inset:0 0 auto 0;
