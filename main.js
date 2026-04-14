@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const earthBgImg = new Image();
   let earthBgReady = false;
   earthBgImg.onload = () => { earthBgReady = true; if (canDraw) draw(); };
-  setImageSrcFromCandidates(earthBgImg, ['earth_bg.png', './earth_bg.png', 'img/earth_bg.png', './img/earth_bg.png']);
+  setImageSrcFromCandidates(earthBgImg, ['earth_bg.jpeg', './earth_bg.jpeg', 'img/earth_bg.jpeg', './img/earth_bg.jpeg']);
 
   // ===== 四種隕石圖片（請放在 /img/ 目錄）=====
   const meteorImgs = {
