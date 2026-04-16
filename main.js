@@ -1,6 +1,19 @@
 // main.js — DOM Ready + 防呆 + 刪除模式
 
-const API_BASE = "/api";
+const API_BASE = (() => {
+  const cfgOrigin = String(window.APP_CONFIG?.RENDER_ORIGIN || '').trim().replace(/\/$/, '');
+  const isGitHubPages = /github\.io$/i.test(location.hostname);
+
+  if (isGitHubPages) {
+    if (cfgOrigin && !/your-render-app\.onrender\.com$/i.test(cfgOrigin)) {
+      return `${cfgOrigin}/api`;
+    }
+    console.warn('⚠️ 尚未設定 Render 網址，請打開 config.js 修改 window.APP_CONFIG.RENDER_ORIGIN');
+    return 'https://your-render-app.onrender.com/api';
+  }
+
+  return '/api';
+})();
 
 async function jsonFetch(path, options = {}) {
   const res = await fetch(path, {
@@ -34,33 +47,6 @@ const API = {
 document.addEventListener('DOMContentLoaded', () => {
   const $ = id => document.getElementById(id);
   const toast = msg => { const t=$('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),900); };
-
-  // ===== 防止 iPad Safari 連點／手勢縮放 =====
-  let lastTouchEnd = 0;
-
-  document.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTouchEnd < 300) {
-      e.preventDefault();
-    }
-    lastTouchEnd = now;
-  }, { passive: false });
-
-  document.addEventListener('gesturestart', (e) => {
-    e.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener('gesturechange', (e) => {
-    e.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener('gestureend', (e) => {
-    e.preventDefault();
-  }, { passive: false });
-
-  document.addEventListener('dblclick', (e) => {
-    e.preventDefault();
-  }, { passive: false });
 
   // 若頁面沒有遊戲畫面（如 teacher.html），直接略過以下初始化
   const canvas = $('gameCanvas');
@@ -109,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const earthBgImg = new Image();
   let earthBgReady = false;
   earthBgImg.onload = () => { earthBgReady = true; if (canDraw) draw(); };
-  setImageSrcFromCandidates(earthBgImg, ['earth_bg.jpeg', './earth_bg.jpeg', 'img/earth_bg.jpeg', './img/earth_bg.jpeg']);
+  setImageSrcFromCandidates(earthBgImg, ['earth_bg.png', './earth_bg.png', 'img/earth_bg.png', './img/earth_bg.png']);
 
   // ===== 四種隕石圖片（請放在 /img/ 目錄）=====
   const meteorImgs = {
@@ -1164,7 +1150,6 @@ const keyPositions = {};
       }
 
       b.dataset.key = ch;
-      b.setAttribute('type', 'button');
       row.appendChild(b);
     });
     kbd.appendChild(row);
@@ -2497,7 +2482,7 @@ async function endAndShowLeader(){
 
   });
 
-  $('teacherOpen') && ($('teacherOpen').onclick = () => { /* 預設超連結就會導去 /teacher */ });
+  $('teacherOpen') && ($('teacherOpen').onclick = () => { /* 預設超連結會導去 ./teacher.html */ });
 
   // 實體鍵盤
   addEventListener('keydown', e => {

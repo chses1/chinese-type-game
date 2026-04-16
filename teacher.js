@@ -1,5 +1,18 @@
 
-const API_BASE = "/api";
+const API_BASE = (() => {
+  const cfgOrigin = String(window.APP_CONFIG?.RENDER_ORIGIN || '').trim().replace(/\/$/, '');
+  const isGitHubPages = /github\.io$/i.test(location.hostname);
+
+  if (isGitHubPages) {
+    if (cfgOrigin && !/your-render-app\.onrender\.com$/i.test(cfgOrigin)) {
+      return `${cfgOrigin}/api`;
+    }
+    console.warn('⚠️ 尚未設定 Render 網址，請打開 config.js 修改 window.APP_CONFIG.RENDER_ORIGIN');
+    return 'https://your-render-app.onrender.com/api';
+  }
+
+  return '/api';
+})();
 const $ = id => document.getElementById(id);
 const TOKEN_KEY = 'teacher-session-token';
 const ACTION_COOLDOWN_MS = 8000;
