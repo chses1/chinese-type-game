@@ -181,48 +181,48 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const LEVEL_NAMES = [
     '新兵報到','基礎定位','注音校準','反應熱身','軌道模擬','冰凍演練','黃金特訓','雙線攔截','高速測考','模擬總測驗',
     '近地警報','防衛啟動','流星攔截線','冰風防衛區','黃金突襲戰','Boss 壓力區','重力亂流帶','星環防衛線','末日倒數','最終決戰',
-    '國字初戰','聲符辨識','韻母追蹤','聲調鎖定','國字連擊','常用字防線','讀音快攻','綜合辨讀','終端校驗','國字總決戰'
+    '數量雷達站','自然核心區','守衛體能營','防衛隊集結','星獸觀測站','植物防護罩','星圖導航線','機動作戰區','戰備器材庫','彩色決戰圈'
   ];
   const HANZI_QUESTIONS = [
     [
-      { word:'不', answer:['ㄅ','ㄨ','ˋ'] }, { word:'大', answer:['ㄉ','ㄚ','ˋ'] }, { word:'小', answer:['ㄒ','ㄧ','ㄠ','ˇ'] },
-      { word:'我', answer:['ㄨ','ㄛ','ˇ'] }, { word:'你', answer:['ㄋ','ㄧ','ˇ'] }, { word:'他', answer:['ㄊ','ㄚ'] }
+      { word:'一', answer:['ㄧ'] }, { word:'二', answer:['ㄦ','ˋ'] }, { word:'三', answer:['ㄙ','ㄢ'] }, { word:'四', answer:['ㄙ','ˋ'] }, { word:'五', answer:['ㄨ','ˇ'] },
+      { word:'六', answer:['ㄌ','ㄧ','ㄡ','ˋ'] }, { word:'七', answer:['ㄑ','ㄧ'] }, { word:'八', answer:['ㄅ','ㄚ'] }, { word:'九', answer:['ㄐ','ㄧ','ㄡ','ˇ'] }, { word:'十', answer:['ㄕ','ˊ'] }
     ],
     [
-      { word:'好', answer:['ㄏ','ㄠ','ˇ'] }, { word:'是', answer:['ㄕ','ˋ'] }, { word:'有', answer:['ㄧ','ㄡ','ˇ'] },
-      { word:'在', answer:['ㄗ','ㄞ','ˋ'] }, { word:'人', answer:['ㄖ','ㄣ','ˊ'] }, { word:'來', answer:['ㄌ','ㄞ','ˊ'] }
+      { word:'天', answer:['ㄊ','ㄧ','ㄢ'] }, { word:'日', answer:['ㄖ','ˋ'] }, { word:'月', answer:['ㄩ','ㄝ','ˋ'] }, { word:'山', answer:['ㄕ','ㄢ'] }, { word:'水', answer:['ㄕ','ㄨ','ㄟ','ˇ'] },
+      { word:'木', answer:['ㄇ','ㄨ','ˋ'] }, { word:'火', answer:['ㄏ','ㄨ','ㄛ','ˇ'] }, { word:'土', answer:['ㄊ','ㄨ','ˇ'] }, { word:'雲', answer:['ㄩ','ㄣ','ˊ'] }, { word:'田', answer:['ㄊ','ㄧ','ㄢ','ˊ'] }
     ],
     [
-      { word:'天', answer:['ㄊ','ㄧ','ㄢ'] }, { word:'地', answer:['ㄉ','ㄧ','ˋ'] }, { word:'日', answer:['ㄖ','ˋ'] },
-      { word:'月', answer:['ㄩ','ㄝ','ˋ'] }, { word:'山', answer:['ㄕ','ㄢ'] }, { word:'水', answer:['ㄕ','ㄨ','ㄟ','ˇ'] }
+      { word:'手', answer:['ㄕ','ㄡ','ˇ'] }, { word:'足', answer:['ㄗ','ㄨ','ˊ'] }, { word:'口', answer:['ㄎ','ㄡ','ˇ'] }, { word:'目', answer:['ㄇ','ㄨ','ˋ'] }, { word:'耳', answer:['ㄦ','ˇ'] },
+      { word:'牙', answer:['ㄧ','ㄚ','ˊ'] }, { word:'舌', answer:['ㄕ','ㄜ','ˊ'] }, { word:'毛', answer:['ㄇ','ㄠ','ˊ'] }, { word:'皮', answer:['ㄆ','ㄧ','ˊ'] }, { word:'眉', answer:['ㄇ','ㄟ','ˊ'] }
     ],
     [
-      { word:'上', answer:['ㄕ','ㄤ','ˋ'] }, { word:'下', answer:['ㄒ','ㄧ','ㄚ','ˋ'] }, { word:'左', answer:['ㄗ','ㄨ','ㄛ','ˇ'] },
-      { word:'右', answer:['ㄧ','ㄡ','ˋ'] }, { word:'中', answer:['ㄓ','ㄨ','ㄥ'] }, { word:'外', answer:['ㄨ','ㄞ','ˋ'] }
+      { word:'人', answer:['ㄖ','ㄣ','ˊ'] }, { word:'父', answer:['ㄈ','ㄨ','ˋ'] }, { word:'母', answer:['ㄇ','ㄨ','ˇ'] }, { word:'兄', answer:['ㄒ','ㄩ','ㄥ'] }, { word:'弟', answer:['ㄉ','ㄧ','ˋ'] },
+      { word:'姐', answer:['ㄐ','ㄧ','ㄝ','ˇ'] }, { word:'妹', answer:['ㄇ','ㄟ','ˋ'] }, { word:'兒', answer:['ㄦ','ˊ'] }, { word:'男', answer:['ㄋ','ㄢ','ˊ'] }, { word:'女', answer:['ㄋ','ㄩ','ˇ'] }
     ],
     [
-      { word:'學', answer:['ㄒ','ㄩ','ㄝ','ˊ'] }, { word:'生', answer:['ㄕ','ㄥ'] }, { word:'老', answer:['ㄌ','ㄠ','ˇ'] },
-      { word:'師', answer:['ㄕ'] }, { word:'書', answer:['ㄕ','ㄨ'] }, { word:'字', answer:['ㄗ','ˋ'] }
+      { word:'牛', answer:['ㄋ','ㄧ','ㄡ','ˊ'] }, { word:'羊', answer:['ㄧ','ㄤ','ˊ'] }, { word:'馬', answer:['ㄇ','ㄚ','ˇ'] }, { word:'魚', answer:['ㄩ','ˊ'] }, { word:'鳥', answer:['ㄋ','ㄧ','ㄠ','ˇ'] },
+      { word:'蟲', answer:['ㄔ','ㄨ','ㄥ','ˊ'] }, { word:'雞', answer:['ㄐ','ㄧ'] }, { word:'犬', answer:['ㄑ','ㄩ','ㄢ','ˇ'] }, { word:'象', answer:['ㄒ','ㄧ','ㄤ','ˋ'] }, { word:'虎', answer:['ㄏ','ㄨ','ˇ'] }
     ],
     [
-      { word:'火', answer:['ㄏ','ㄨ','ㄛ','ˇ'] }, { word:'風', answer:['ㄈ','ㄥ'] }, { word:'雨', answer:['ㄩ','ˇ'] },
-      { word:'星', answer:['ㄒ','ㄧ','ㄥ'] }, { word:'雲', answer:['ㄩ','ㄣ','ˊ'] }, { word:'光', answer:['ㄍ','ㄨ','ㄤ'] }
+      { word:'花', answer:['ㄏ','ㄨ','ㄚ'] }, { word:'草', answer:['ㄘ','ㄠ','ˇ'] }, { word:'葉', answer:['ㄧ','ㄝ','ˋ'] }, { word:'根', answer:['ㄍ','ㄣ'] }, { word:'枝', answer:['ㄓ'] },
+      { word:'果', answer:['ㄍ','ㄨ','ㄛ','ˇ'] }, { word:'瓜', answer:['ㄍ','ㄨ','ㄚ'] }, { word:'豆', answer:['ㄉ','ㄡ','ˋ'] }, { word:'竹', answer:['ㄓ','ㄨ','ˊ'] }, { word:'禾', answer:['ㄏ','ㄜ','ˊ'] }
     ],
     [
-      { word:'吃', answer:['ㄔ'] }, { word:'喝', answer:['ㄏ','ㄜ'] }, { word:'看', answer:['ㄎ','ㄢ','ˋ'] },
-      { word:'聽', answer:['ㄊ','ㄧ','ㄥ'] }, { word:'說', answer:['ㄕ','ㄨ','ㄛ'] }, { word:'寫', answer:['ㄒ','ㄧ','ㄝ','ˇ'] }
+      { word:'上', answer:['ㄕ','ㄤ','ˋ'] }, { word:'下', answer:['ㄒ','ㄧ','ㄚ','ˋ'] }, { word:'左', answer:['ㄗ','ㄨ','ㄛ','ˇ'] }, { word:'右', answer:['ㄧ','ㄡ','ˋ'] }, { word:'前', answer:['ㄑ','ㄧ','ㄢ','ˊ'] },
+      { word:'後', answer:['ㄏ','ㄡ','ˋ'] }, { word:'內', answer:['ㄋ','ㄟ','ˋ'] }, { word:'外', answer:['ㄨ','ㄞ','ˋ'] }, { word:'東', answer:['ㄉ','ㄨ','ㄥ'] }, { word:'西', answer:['ㄒ','ㄧ'] }
     ],
     [
-      { word:'紅', answer:['ㄏ','ㄨ','ㄥ','ˊ'] }, { word:'黃', answer:['ㄏ','ㄨ','ㄤ','ˊ'] }, { word:'白', answer:['ㄅ','ㄞ','ˊ'] },
-      { word:'黑', answer:['ㄏ','ㄟ'] }, { word:'青', answer:['ㄑ','ㄧ','ㄥ'] }, { word:'綠', answer:['ㄌ','ㄩ','ˋ'] }
+      { word:'走', answer:['ㄗ','ㄡ','ˇ'] }, { word:'跑', answer:['ㄆ','ㄠ','ˇ'] }, { word:'坐', answer:['ㄗ','ㄨ','ㄛ','ˋ'] }, { word:'立', answer:['ㄌ','ㄧ','ˋ'] }, { word:'爬', answer:['ㄆ','ㄚ','ˊ'] },
+      { word:'飛', answer:['ㄈ','ㄟ'] }, { word:'哭', answer:['ㄎ','ㄨ'] }, { word:'叫', answer:['ㄐ','ㄧ','ㄠ','ˋ'] }, { word:'吹', answer:['ㄔ','ㄨ','ㄟ'] }, { word:'抓', answer:['ㄓ','ㄨ','ㄚ'] }
     ],
     [
-      { word:'國', answer:['ㄍ','ㄨ','ㄛ','ˊ'] }, { word:'家', answer:['ㄐ','ㄧ','ㄚ'] }, { word:'車', answer:['ㄔ','ㄜ'] },
-      { word:'路', answer:['ㄌ','ㄨ','ˋ'] }, { word:'門', answer:['ㄇ','ㄣ','ˊ'] }, { word:'電', answer:['ㄉ','ㄧ','ㄢ','ˋ'] }
+      { word:'書', answer:['ㄕ','ㄨ'] }, { word:'筆', answer:['ㄅ','ㄧ','ˇ'] }, { word:'刀', answer:['ㄉ','ㄠ'] }, { word:'車', answer:['ㄔ','ㄜ'] }, { word:'門', answer:['ㄇ','ㄣ','ˊ'] },
+      { word:'窗', answer:['ㄔ','ㄨ','ㄤ'] }, { word:'衣', answer:['ㄧ'] }, { word:'巾', answer:['ㄐ','ㄧ','ㄣ'] }, { word:'弓', answer:['ㄍ','ㄨ','ㄥ'] }, { word:'矢', answer:['ㄕ','ˇ'] }
     ],
     [
-      { word:'愛', answer:['ㄞ','ˋ'] }, { word:'樂', answer:['ㄌ','ㄜ','ˋ'] }, { word:'安', answer:['ㄢ'] },
-      { word:'想', answer:['ㄒ','ㄧ','ㄤ','ˇ'] }, { word:'夢', answer:['ㄇ','ㄥ','ˋ'] }, { word:'贏', answer:['ㄧ','ㄥ','ˊ'] }
+      { word:'圓', answer:['ㄩ','ㄢ','ˊ'] }, { word:'尖', answer:['ㄐ','ㄧ','ㄢ'] }, { word:'高', answer:['ㄍ','ㄠ'] }, { word:'低', answer:['ㄉ','ㄧ'] }, { word:'紅', answer:['ㄏ','ㄨ','ㄥ','ˊ'] },
+      { word:'白', answer:['ㄅ','ㄞ','ˊ'] }, { word:'黃', answer:['ㄏ','ㄨ','ㄤ','ˊ'] }, { word:'黑', answer:['ㄏ','ㄟ'] }, { word:'青', answer:['ㄑ','ㄧ','ㄥ'] }, { word:'綠', answer:['ㄌ','ㄩ','ˋ'] }
     ]
   ];
   const BEGINNER_TRIAL_CLEAR_LEVEL = 10;
