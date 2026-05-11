@@ -2420,6 +2420,14 @@ async function endAndShowLeader(){
           },
           themeOverride: 'legend'
         });
+        setLives();
+        try {
+          if (me.sid) await submitBest(me.sid, score, level);
+          await setBest();
+        } catch (e) {
+          console.warn('stage 20 clear submit/setBest fail', e);
+        }
+        return;
       } else {
         showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
       }
