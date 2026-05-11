@@ -125,6 +125,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const MEDIAL =new Set(['ㄧ','ㄨ','ㄩ']);const TONE   =new Set(['ˇ','ˋ','ˊ','˙']);
 // ✅ 聲調鍵獨立一類（方便上色與後續統計）
 const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(TONE.has(ch)?'tone':'yunmu'));
+  const PHYSICAL_KEY_TO_ZHUYIN = {
+    Digit1:'ㄅ', KeyQ:'ㄆ', KeyA:'ㄇ', KeyZ:'ㄈ',
+    Digit2:'ㄉ', KeyW:'ㄊ', KeyS:'ㄋ', KeyX:'ㄌ',
+    KeyE:'ㄍ', KeyD:'ㄎ', KeyC:'ㄏ',
+    KeyR:'ㄐ', KeyF:'ㄑ', KeyV:'ㄒ',
+    Digit5:'ㄓ', KeyT:'ㄔ', KeyG:'ㄕ', KeyB:'ㄖ',
+    KeyY:'ㄗ', KeyH:'ㄘ', KeyN:'ㄙ',
+    KeyU:'ㄧ', KeyJ:'ㄨ', KeyM:'ㄩ',
+    Digit8:'ㄚ', KeyI:'ㄛ', KeyK:'ㄜ', Comma:'ㄝ',
+    Digit9:'ㄞ', KeyO:'ㄟ', KeyL:'ㄠ', Period:'ㄡ',
+    Digit0:'ㄢ', KeyP:'ㄣ', Semicolon:'ㄤ', Slash:'ㄥ',
+    Minus:'ㄦ',
+    Digit3:'ˇ', Digit4:'ˋ', Digit6:'ˊ', Digit7:'˙'
+  };
 
 
   // === 等級 & 速度 ===
@@ -2603,41 +2617,40 @@ async function endAndShowLeader(){
     // Shift + Q~P = 第 11~20 關
     // Shift + A~L / ; = 第 21~30 關
     if (e.shiftKey) {
-      const jumpMap = {
-        '1': 1,
-        '2': 2,
-        '3': 3,
-        '4': 4,
-        '5': 5,
-        '6': 6,
-        '7': 7,
-        '8': 8,
-        '9': 9,
-        '0': 10,
-        'Q': 11,
-        'W': 12,
-        'E': 13,
-        'R': 14,
-        'T': 15,
-        'Y': 16,
-        'U': 17,
-        'I': 18,
-        'O': 19,
-        'P': 20,
-        'A': 21,
-        'S': 22,
-        'D': 23,
-        'F': 24,
-        'G': 25,
-        'H': 26,
-        'J': 27,
-        'K': 28,
-        'L': 29,
-        ';': 30
+      const jumpMapByCode = {
+        Digit1: 1,
+        Digit2: 2,
+        Digit3: 3,
+        Digit4: 4,
+        Digit5: 5,
+        Digit6: 6,
+        Digit7: 7,
+        Digit8: 8,
+        Digit9: 9,
+        Digit0: 10,
+        KeyQ: 11,
+        KeyW: 12,
+        KeyE: 13,
+        KeyR: 14,
+        KeyT: 15,
+        KeyY: 16,
+        KeyU: 17,
+        KeyI: 18,
+        KeyO: 19,
+        KeyP: 20,
+        KeyA: 21,
+        KeyS: 22,
+        KeyD: 23,
+        KeyF: 24,
+        KeyG: 25,
+        KeyH: 26,
+        KeyJ: 27,
+        KeyK: 28,
+        KeyL: 29,
+        Semicolon: 30
       };
 
-      const key = String(e.key || '').toUpperCase();
-      const targetLevel = jumpMap[key];
+      const targetLevel = jumpMapByCode[e.code];
 
       if (targetLevel) {
         e.preventDefault();
@@ -2648,7 +2661,16 @@ async function endAndShowLeader(){
 
     if (e.key === ' ') { e.preventDefault(); toggleRun(); return; }
     if (e.key === 'Escape') { pauseGame(); return; }
-    if (ZHUYIN.includes(e.key)) { pressKey(e.key); }
+    const physicalZhuyin = !e.metaKey && !e.ctrlKey && !e.altKey ? PHYSICAL_KEY_TO_ZHUYIN[e.code] : '';
+    if (physicalZhuyin) {
+      e.preventDefault();
+      pressKey(physicalZhuyin);
+      return;
+    }
+    if (ZHUYIN.includes(e.key)) {
+      e.preventDefault();
+      pressKey(e.key);
+    }
   });
 
   // 初始化
