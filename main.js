@@ -152,14 +152,68 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     { lpm:32, duration:60, speedMul:2.25, bossChance:0.13, goldChance:0.06, iceChance:0.06, finalBossChance:0.39, finalExtraBoss:4, eventCount:2 },
     { lpm:34, duration:60, speedMul:2.43, bossChance:0.14, goldChance:0.05, iceChance:0.06, finalBossChance:0.41, finalExtraBoss:4, eventCount:2 },
     { lpm:36, duration:60, speedMul:2.62, bossChance:0.15, goldChance:0.05, iceChance:0.05, finalBossChance:0.43, finalExtraBoss:4, eventCount:2 },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2 }
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2 },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
+    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' }
   ];
   const LEVEL_NAMES = [
     '新兵報到','基礎定位','注音校準','反應熱身','軌道模擬','冰凍演練','黃金特訓','雙線攔截','高速測考','模擬總測驗',
-    '近地警報','防衛啟動','流星攔截線','冰風防衛區','黃金突襲戰','Boss 壓力區','重力亂流帶','星環防衛線','末日倒數','最終決戰'
+    '近地警報','防衛啟動','流星攔截線','冰風防衛區','黃金突襲戰','Boss 壓力區','重力亂流帶','星環防衛線','末日倒數','最終決戰',
+    '國字初戰','聲符辨識','韻母追蹤','聲調鎖定','國字連擊','常用字防線','讀音快攻','綜合辨讀','終端校驗','國字總決戰'
+  ];
+  const HANZI_QUESTIONS = [
+    [
+      { word:'不', answer:['ㄅ','ㄨ','ˋ'] }, { word:'大', answer:['ㄉ','ㄚ','ˋ'] }, { word:'小', answer:['ㄒ','ㄧ','ㄠ','ˇ'] },
+      { word:'我', answer:['ㄨ','ㄛ','ˇ'] }, { word:'你', answer:['ㄋ','ㄧ','ˇ'] }, { word:'他', answer:['ㄊ','ㄚ'] }
+    ],
+    [
+      { word:'好', answer:['ㄏ','ㄠ','ˇ'] }, { word:'是', answer:['ㄕ','ˋ'] }, { word:'有', answer:['ㄧ','ㄡ','ˇ'] },
+      { word:'在', answer:['ㄗ','ㄞ','ˋ'] }, { word:'人', answer:['ㄖ','ㄣ','ˊ'] }, { word:'來', answer:['ㄌ','ㄞ','ˊ'] }
+    ],
+    [
+      { word:'天', answer:['ㄊ','ㄧ','ㄢ'] }, { word:'地', answer:['ㄉ','ㄧ','ˋ'] }, { word:'日', answer:['ㄖ','ˋ'] },
+      { word:'月', answer:['ㄩ','ㄝ','ˋ'] }, { word:'山', answer:['ㄕ','ㄢ'] }, { word:'水', answer:['ㄕ','ㄨ','ㄟ','ˇ'] }
+    ],
+    [
+      { word:'上', answer:['ㄕ','ㄤ','ˋ'] }, { word:'下', answer:['ㄒ','ㄧ','ㄚ','ˋ'] }, { word:'左', answer:['ㄗ','ㄨ','ㄛ','ˇ'] },
+      { word:'右', answer:['ㄧ','ㄡ','ˋ'] }, { word:'中', answer:['ㄓ','ㄨ','ㄥ'] }, { word:'外', answer:['ㄨ','ㄞ','ˋ'] }
+    ],
+    [
+      { word:'學', answer:['ㄒ','ㄩ','ㄝ','ˊ'] }, { word:'生', answer:['ㄕ','ㄥ'] }, { word:'老', answer:['ㄌ','ㄠ','ˇ'] },
+      { word:'師', answer:['ㄕ'] }, { word:'書', answer:['ㄕ','ㄨ'] }, { word:'字', answer:['ㄗ','ˋ'] }
+    ],
+    [
+      { word:'火', answer:['ㄏ','ㄨ','ㄛ','ˇ'] }, { word:'風', answer:['ㄈ','ㄥ'] }, { word:'雨', answer:['ㄩ','ˇ'] },
+      { word:'星', answer:['ㄒ','ㄧ','ㄥ'] }, { word:'雲', answer:['ㄩ','ㄣ','ˊ'] }, { word:'光', answer:['ㄍ','ㄨ','ㄤ'] }
+    ],
+    [
+      { word:'吃', answer:['ㄔ'] }, { word:'喝', answer:['ㄏ','ㄜ'] }, { word:'看', answer:['ㄎ','ㄢ','ˋ'] },
+      { word:'聽', answer:['ㄊ','ㄧ','ㄥ'] }, { word:'說', answer:['ㄕ','ㄨ','ㄛ'] }, { word:'寫', answer:['ㄒ','ㄧ','ㄝ','ˇ'] }
+    ],
+    [
+      { word:'紅', answer:['ㄏ','ㄨ','ㄥ','ˊ'] }, { word:'黃', answer:['ㄏ','ㄨ','ㄤ','ˊ'] }, { word:'白', answer:['ㄅ','ㄞ','ˊ'] },
+      { word:'黑', answer:['ㄏ','ㄟ'] }, { word:'青', answer:['ㄑ','ㄧ','ㄥ'] }, { word:'綠', answer:['ㄌ','ㄩ','ˋ'] }
+    ],
+    [
+      { word:'國', answer:['ㄍ','ㄨ','ㄛ','ˊ'] }, { word:'家', answer:['ㄐ','ㄧ','ㄚ'] }, { word:'車', answer:['ㄔ','ㄜ'] },
+      { word:'路', answer:['ㄌ','ㄨ','ˋ'] }, { word:'門', answer:['ㄇ','ㄣ','ˊ'] }, { word:'電', answer:['ㄉ','ㄧ','ㄢ','ˋ'] }
+    ],
+    [
+      { word:'愛', answer:['ㄞ','ˋ'] }, { word:'樂', answer:['ㄌ','ㄜ','ˋ'] }, { word:'安', answer:['ㄢ'] },
+      { word:'想', answer:['ㄒ','ㄧ','ㄤ','ˇ'] }, { word:'夢', answer:['ㄇ','ㄥ','ˋ'] }, { word:'贏', answer:['ㄧ','ㄥ','ˊ'] }
+    ]
   ];
   const BEGINNER_TRIAL_CLEAR_LEVEL = 10;
   const getLevelCfg = () => LEVELS[level - 1] || LEVELS.at(-1);
+  const isHanziLevel = () => getLevelCfg().mode === 'hanzi';
   const spawnInterval = () => Math.max(320, Math.round(60000 / getLevelCfg().lpm));
   const levelFallFactor = () => getLevelCfg().speedMul;
 
@@ -356,7 +410,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     ctx.shadowBlur = 0;
     ctx.font = `bold ${Math.max(20, Math.min(32, W * 0.018))}px system-ui`;
     ctx.fillStyle = 'rgba(225, 242, 255, 0.96)';
-        ctx.fillText('第 20 關最終任務完成，地球防衛作戰勝利', cx, titleY + 54);
+        ctx.fillText('第 30 關最終任務完成，地球防衛作戰勝利', cx, titleY + 54);
 
     if (t >= 2100) {
       const cardW = Math.min(720, W * 0.78);
@@ -539,7 +593,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     };
     eventExtraSpawnTimer = 0;
 
-    if (picked.id === 'goldRush' && spawnMeteor('gold', null, { speedMul: picked.extraSpeedMul || 1 })) {
+    if (picked.id === 'goldRush' && spawnMeteor('gold', null, { speedMul: isHanziLevel() ? 1 : (picked.extraSpeedMul || 1) })) {
       activeEvent.extraSpawned = 1;
     }
 
@@ -1188,15 +1242,23 @@ function chooseMeteorType(){
   return type;
 }
 
+function pickHanziQuestion(){
+  const idx = Math.max(0, Math.min(HANZI_QUESTIONS.length - 1, level - 21));
+  const pool = HANZI_QUESTIONS[idx] || HANZI_QUESTIONS[0] || [];
+  return pool[Math.floor(Math.random() * pool.length)] || { word:'不', answer:['ㄅ','ㄨ','ˋ'] };
+}
+
 function spawnMeteor(forceType = null, forceLabel = null, options = {}){
-  const label = forceLabel || ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
+  const hanziQuestion = !forceLabel && isHanziLevel() ? pickHanziQuestion() : null;
+  const answer = hanziQuestion ? [...hanziQuestion.answer] : null;
+  const label = forceLabel || hanziQuestion?.word || ZHUYIN[Math.floor(Math.random() * ZHUYIN.length)];
   const type = forceType || chooseMeteorType();
 
-  const targetKey = label;
+  const targetKey = answer ? answer[0] : label;
   if (!keyPositions[targetKey]) return false;
   const target = keyPositions[targetKey];
 
-  const fromLeft = !SHENGMU.has(label);
+  const fromLeft = !SHENGMU.has(targetKey);
   const startX = fromLeft ? -60 : W + 60;
   const startY = -80;
 
@@ -1223,6 +1285,8 @@ function spawnMeteor(forceType = null, forceLabel = null, options = {}){
     y: startY,
     vx, vy,
     label,
+    answer,
+    inputIndex: 0,
     type,
     hp,
     sizeMul,
@@ -1252,7 +1316,7 @@ function processEventExtraSpawns(deltaMs = 16){
   }
 
   eventExtraSpawnTimer = 0;
-  if (spawnMeteor(eventState.guaranteedType, null, { speedMul: eventState.extraSpeedMul || 1 })) {
+  if (spawnMeteor(eventState.guaranteedType, null, { speedMul: isHanziLevel() ? 1 : (eventState.extraSpeedMul || 1) })) {
     eventState.extraSpawned = (eventState.extraSpawned || 0) + 1;
   }
 }
@@ -1374,7 +1438,8 @@ function spawn(){
     // ✅ 修正：翻轉圖片時，文字的「水平微調」也要一起鏡像，才能保持在隕石正中心
     // 你原本的 xOffset = -size*0.08 是為了配合「未翻轉」圖檔的視覺中心
     // 當 flipX=true（往右飛、圖片水平翻轉）時，xOffset 需要改成 +size*0.08
-    ctx.font='bold 100px system-ui';
+    const isHanziMeteor = Array.isArray(m.answer);
+    ctx.font=`bold ${isHanziMeteor ? 112 : 100}px system-ui`;
     ctx.textAlign='center';
     ctx.textBaseline='middle';
     ctx.lineWidth=5;
@@ -1384,6 +1449,20 @@ function spawn(){
     ctx.strokeText(m.label, xOffset, yOffset);
     ctx.fillStyle='#fff';
     ctx.fillText(m.label, xOffset, yOffset);
+
+    if (isHanziMeteor) {
+      const progress = Math.max(0, Math.min(m.answer.length, m.inputIndex || 0));
+      const answerText = m.answer.join('');
+      const typedText = answerText.slice(0, progress);
+      const progressText = typedText + '·'.repeat(Math.max(0, m.answer.length - progress));
+      const progressY = yOffset + size * 0.33;
+      ctx.font=`bold ${Math.max(22, Math.round(size * 0.18))}px system-ui`;
+      ctx.lineWidth=4;
+      ctx.strokeStyle='rgba(0,0,0,.68)';
+      ctx.strokeText(progressText, xOffset, progressY);
+      ctx.fillStyle=typedText ? 'rgba(255,230,90,1)' : 'rgba(255,255,255,.64)';
+      ctx.fillText(progressText, xOffset, progressY);
+    }
 
     ctx.restore();
   });
@@ -1797,7 +1876,8 @@ function spawn(){
     let idx=-1, bestY=-1;
     for(let i=0;i<meteors.length;i++){
       const m=meteors[i];
-      if(m.label===ch && m.y>bestY){ bestY=m.y; idx=i; }
+      const expected = Array.isArray(m.answer) ? m.answer[m.inputIndex || 0] : m.label;
+      if(expected===ch && m.y>bestY){ bestY=m.y; idx=i; }
     }
     if(idx>=0){
       const m = meteors[idx];
@@ -1805,6 +1885,13 @@ function spawn(){
       const o = getKeyOrigin(ch);
       spawnLaser(o.x, o.y, m.x, m.y, m.type || 'normal');
 
+      if (Array.isArray(m.answer)) {
+        m.inputIndex = Math.min(m.answer.length, (m.inputIndex || 0) + 1);
+        if (m.inputIndex < m.answer.length) {
+          addScorePopup(m.x, m.y - meteorVisualSize(m) * 0.45, `${m.inputIndex}/${m.answer.length}`, m.type || 'normal', 520);
+          return;
+        }
+      }
 
       // ✅ NEW: Boss 有血量（打到先扣血，血量歸 0 才消失）
       let removed = true;
@@ -1814,6 +1901,7 @@ function spawn(){
           removed = false;
           // 讓下一次計算反應時間更公平
           m.born = performance.now();
+          if (Array.isArray(m.answer)) m.inputIndex = 0;
         }
       }
 
@@ -1898,6 +1986,7 @@ function spawn(){
       }
     }else{
       // 打錯：連擊歸零
+      meteors.forEach(m => { if (Array.isArray(m.answer)) m.inputIndex = 0; });
       combo = 0;
       comboEnergy = Math.max(0, comboEnergy - 22);
       updateMissionProgress();
@@ -1929,7 +2018,7 @@ function spawn(){
       const f = levelFallFactor();
       const slow = (now < slowUntil) ? SLOW_FACTOR : 1;
       const eventSlow = eventState?.globalSlow || 1;
-      const dangerBoost = dangerMode ? FINAL_ALERT_SPEED_BOOST : 1;
+      const dangerBoost = dangerMode && !isHanziLevel() ? FINAL_ALERT_SPEED_BOOST : 1;
 
       meteors.forEach(m => {
         m.x += m.vx * 2 * f * slow * eventSlow * dangerBoost;
@@ -2293,6 +2382,29 @@ async function endAndShowLeader(){
           },
           themeOverride: 'legend'
         });
+      } else if (clearedLevel === 20) {
+        showResult({
+          correct,
+          wrong,
+          acc,
+          speed,
+          passed,
+          livesLeft: lives,
+          gameOver: false,
+          titleOverride: '📘 國字挑戰解鎖',
+          titleDescOverride: '你已完成高速防衛訓練，接下來進入國字注音辨讀。',
+          progressTextOverride: '第 21～30 關隕石速度不再提升，隕石題目會改成國字。',
+          outcomeTextOverride: `✅ 已完成第 ${clearedLevel} 關，保留 ${lives}/${MAX_LIVES} 次接關機會`,
+          promoTextOverride: '🏅 新階段：看到國字後，請依序打出正確注音。',
+          primaryText: '📘 進入第 21 關國字挑戰',
+          primaryAction: () => {
+            closeResult();
+            gameEnded = false;
+            resetRoundState({ keepExisting:true });
+            startGame();
+          },
+          themeOverride: 'legend'
+        });
       } else {
         showResult({ correct, wrong, acc, speed, passed, livesLeft: lives, gameOver: false });
       }
@@ -2488,6 +2600,7 @@ async function endAndShowLeader(){
   addEventListener('keydown', e => {
     // Shift + 1~0 = 第 1~10 關
     // Shift + Q~P = 第 11~20 關
+    // Shift + A~L / ; = 第 21~30 關
     if (e.shiftKey) {
       const jumpMap = {
         '1': 1,
@@ -2509,7 +2622,17 @@ async function endAndShowLeader(){
         'U': 17,
         'I': 18,
         'O': 19,
-        'P': 20
+        'P': 20,
+        'A': 21,
+        'S': 22,
+        'D': 23,
+        'F': 24,
+        'G': 25,
+        'H': 26,
+        'J': 27,
+        'K': 28,
+        'L': 29,
+        ';': 30
       };
 
       const key = String(e.key || '').toUpperCase();
