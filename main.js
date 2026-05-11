@@ -214,6 +214,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   const BEGINNER_TRIAL_CLEAR_LEVEL = 10;
   const getLevelCfg = () => LEVELS[level - 1] || LEVELS.at(-1);
   const isHanziLevel = () => getLevelCfg().mode === 'hanzi';
+  const HANZI_FALL_SPEED_MUL = 0.55;
   const spawnInterval = () => Math.max(320, Math.round(60000 / getLevelCfg().lpm));
   const levelFallFactor = () => getLevelCfg().speedMul;
 
@@ -1270,7 +1271,7 @@ function spawnMeteor(forceType = null, forceLabel = null, options = {}){
   const len = Math.hypot(dx, dy) || 1;
 
   const speedMap = { normal:2.2, gold:2.75, ice:2.0, boss:1.95 };
-  const typeSpeed = (speedMap[type] || speedMap.normal) * (Number(options.speedMul) || 1);
+  const typeSpeed = (speedMap[type] || speedMap.normal) * (Number(options.speedMul) || 1) * (answer ? HANZI_FALL_SPEED_MUL : 1);
 
   const vx = (dx / len) * typeSpeed;
   const vy = (dy / len) * typeSpeed;
