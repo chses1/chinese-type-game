@@ -153,16 +153,16 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     { lpm:34, duration:60, speedMul:2.43, bossChance:0.14, goldChance:0.05, iceChance:0.06, finalBossChance:0.41, finalExtraBoss:4, eventCount:2 },
     { lpm:36, duration:60, speedMul:2.62, bossChance:0.15, goldChance:0.05, iceChance:0.05, finalBossChance:0.43, finalExtraBoss:4, eventCount:2 },
     { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2 },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' },
-    { lpm:38, duration:60, speedMul:2.82, bossChance:0.16, goldChance:0.05, iceChance:0.05, finalBossChance:0.45, finalExtraBoss:5, eventCount:2, mode:'hanzi' }
+    { lpm:9,  duration:60, speedMul:1.00, bossChance:0.02, goldChance:0.12, iceChance:0.12, finalBossChance:0.16, finalExtraBoss:1, eventCount:1, mode:'hanzi' },
+    { lpm:10, duration:60, speedMul:1.03, bossChance:0.02, goldChance:0.12, iceChance:0.12, finalBossChance:0.17, finalExtraBoss:1, eventCount:1, mode:'hanzi' },
+    { lpm:11, duration:60, speedMul:1.06, bossChance:0.03, goldChance:0.11, iceChance:0.12, finalBossChance:0.18, finalExtraBoss:1, eventCount:2, mode:'hanzi' },
+    { lpm:12, duration:60, speedMul:1.09, bossChance:0.03, goldChance:0.11, iceChance:0.11, finalBossChance:0.19, finalExtraBoss:1, eventCount:2, mode:'hanzi' },
+    { lpm:13, duration:60, speedMul:1.12, bossChance:0.04, goldChance:0.10, iceChance:0.11, finalBossChance:0.20, finalExtraBoss:1, eventCount:2, mode:'hanzi' },
+    { lpm:14, duration:60, speedMul:1.15, bossChance:0.04, goldChance:0.10, iceChance:0.10, finalBossChance:0.21, finalExtraBoss:1, eventCount:2, mode:'hanzi' },
+    { lpm:15, duration:60, speedMul:1.18, bossChance:0.05, goldChance:0.10, iceChance:0.10, finalBossChance:0.22, finalExtraBoss:2, eventCount:2, mode:'hanzi' },
+    { lpm:16, duration:60, speedMul:1.21, bossChance:0.05, goldChance:0.09, iceChance:0.10, finalBossChance:0.23, finalExtraBoss:2, eventCount:2, mode:'hanzi' },
+    { lpm:17, duration:60, speedMul:1.24, bossChance:0.06, goldChance:0.09, iceChance:0.09, finalBossChance:0.24, finalExtraBoss:2, eventCount:2, mode:'hanzi' },
+    { lpm:18, duration:60, speedMul:1.27, bossChance:0.06, goldChance:0.08, iceChance:0.09, finalBossChance:0.25, finalExtraBoss:2, eventCount:2, mode:'hanzi' }
   ];
   const LEVEL_NAMES = [
     '新兵報到','基礎定位','注音校準','反應熱身','軌道模擬','冰凍演練','黃金特訓','雙線攔截','高速測考','模擬總測驗',
