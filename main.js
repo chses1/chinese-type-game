@@ -30,12 +30,16 @@ async function jsonFetch(path, options = {}) {
 }
 
 const STUDENT_TOKEN_KEY = 'student-session-token';
+const TEACHER_TOKEN_KEY = 'teacher-session-token';
 function getStudentToken(){ return localStorage.getItem(STUDENT_TOKEN_KEY) || ''; }
 function setStudentToken(v){ if (v) localStorage.setItem(STUDENT_TOKEN_KEY, v); else localStorage.removeItem(STUDENT_TOKEN_KEY); }
 const studentAuthHeaders = token => token ? { 'x-student-session': token } : {};
+const adminAuthHeaders = token => token ? { 'x-admin-session': token } : {};
 
 const API = {
   googleLogin(idToken) { return jsonFetch(`${API_BASE}/auth/google`, { method:"POST", body:JSON.stringify({ idToken }) }); },
+  adminGoogleLogin(idToken){ return jsonFetch(`${API_BASE}/admin/google-login`, { method:"POST", body: JSON.stringify({ idToken }) }); },
+  adminOnlineStudents(token){ return jsonFetch(`${API_BASE}/admin/online-students`, { headers: adminAuthHeaders(token) }); },
   me(token) { return jsonFetch(`${API_BASE}/me`, { headers: studentAuthHeaders(token) }); },
   bindStudent(payload, token) { return jsonFetch(`${API_BASE}/student/bind`, { method:"POST", headers: studentAuthHeaders(token), body:JSON.stringify(payload) }); },
   upsertStudent(payload) { return jsonFetch(`${API_BASE}/upsert-student`, { method:"POST", body:JSON.stringify(payload) }); },
@@ -859,6 +863,8 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let me={sid:null,name:'',email:'',displayName:'',classPrefix:'',seatNo:'',bound:false};
   let studentToken = getStudentToken();
   let firebaseAuth = null;
+  const queryParams = new URLSearchParams(location.search);
+  const teacherDemoMode = queryParams.get('demo') === 'teacher';
   let leaderMode = 'class';
   let teacherToken="";
 
@@ -879,7 +885,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let classroomSyncInFlight = false;
 
   async function sendHeartbeat(status='online'){
-    if (!me.sid || !studentToken || heartbeatInFlight) return;
+    if (teacherDemoMode || !me.sid || !studentToken || heartbeatInFlight) return;
     heartbeatInFlight = true;
     try {
       await API.studentHeartbeat({ score, status, classroom: classroomMode }, studentToken);
@@ -1136,10 +1142,11 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   async function setBest(){
     const b = $('best');
-    if (!b || !me.sid) return;
+    if (!b || !me.sid || teacherDemoMode) return;
     try { const r = await API.getStudent(me.sid, studentToken); if (r.ok) b.textContent = r.data.best; } catch{}
   }
   async function submitBest(sid, score, levelReached = level){
+    if (teacherDemoMode) return;
     try { await API.updateBest({ score, level: levelReached }, studentToken); } catch(e){ console.warn('submitBest fail', e); }
   }
 // 🔑 記錄每個注音鍵在 canvas 中對應的位置
@@ -2498,6 +2505,35 @@ async function endAndShowLeader(){
     draw();
   }
 
+  async function enterTeacherDemoMode(){
+    const token = localStorage.getItem(TEACHER_TOKEN_KEY) || '';
+    if (!token) return false;
+    try {
+      await API.adminOnlineStudents(token);
+    } catch (e) {
+      alert('教師示範登入已過期，請回教師後台重新登入。');
+      location.href = './teacher.html';
+      return false;
+    }
+
+    me = {
+      sid: '00000',
+      name: '教師示範',
+      email: '',
+      displayName: '教師示範',
+      classPrefix: '000',
+      seatNo: '00',
+      bound: true
+    };
+    setUserChip();
+    if ($('login')) $('login').style.display = 'none';
+    setModeChip('模式：教師示範教學', true);
+    const targetLevel = Math.max(1, Math.min(LEVELS.length, Number(queryParams.get('level') || 1)));
+    jumpToLevel(targetLevel);
+    startGame();
+    return true;
+  }
+
   function setLeaderModeButtons(mode='class'){
     $('btnClassLeader')?.classList.toggle('active', mode === 'class');
     $('btnGlobalLeader')?.classList.toggle('active', mode === 'global');
@@ -2595,9 +2631,11 @@ async function endAndShowLeader(){
     setStudentToken('');
     firebaseAuth?.signOut?.().catch(() => {});
     setUserChip();
-    if ($('classPrefixBind')) $('classPrefixBind').value = '';
-    if ($('seatNoBind')) $('seatNoBind').value = '';
+    if ($('classSeatBind')) $('classSeatBind').value = '';
     if ($('googleUserText')) $('googleUserText').textContent = '';
+    if ($('studentBindPanel')) $('studentBindPanel').hidden = true;
+    if ($('studentStartPanel')) $('studentStartPanel').hidden = true;
+    if ($('btnGoogleLogin')) $('btnGoogleLogin').style.display = '';
     if ($('login')) $('login').style.display = 'flex';
   }
 
@@ -2620,8 +2658,10 @@ async function endAndShowLeader(){
     if ($('googleUserText')) {
       $('googleUserText').textContent = me.email ? `已登入：${me.displayName || me.email}` : '';
     }
-    if ($('classPrefixBind') && me.classPrefix) $('classPrefixBind').value = me.classPrefix;
-    if ($('seatNoBind') && me.seatNo) $('seatNoBind').value = me.seatNo;
+    if ($('classSeatBind') && me.sid) $('classSeatBind').value = me.sid;
+    if ($('studentBindPanel')) $('studentBindPanel').hidden = !!me.sid;
+    if ($('studentStartPanel')) $('studentStartPanel').hidden = false;
+    if ($('btnGoogleLogin')) $('btnGoogleLogin').style.display = me.email ? 'none' : '';
     setUserChip();
   }
 
@@ -2642,11 +2682,26 @@ async function endAndShowLeader(){
     provider.setCustomParameters({ prompt: 'select_account' });
     const result = await auth.signInWithPopup(provider);
     const idToken = await result.user.getIdToken(true);
+
+    try {
+      const adminResp = await API.adminGoogleLogin(idToken);
+      const adminToken = adminResp?.data?.sessionToken || '';
+      if (adminToken) {
+        localStorage.setItem(TEACHER_TOKEN_KEY, adminToken);
+        location.href = './teacher.html';
+        return { teacher: true };
+      }
+    } catch (err) {
+      console.info('not a teacher account, continue as student');
+    }
+
     const resp = await API.googleLogin(idToken);
     studentToken = resp?.data?.sessionToken || '';
     if (!studentToken) throw new Error('伺服器沒有回傳學生登入 session');
     setStudentToken(studentToken);
     applyStudentUser(resp?.data?.user || {});
+    if (!resp?.data?.user?.sid && $('studentBindPanel')) $('studentBindPanel').hidden = false;
+    if (!resp?.data?.user?.sid && $('studentStartPanel')) $('studentStartPanel').hidden = false;
     return resp?.data?.user || {};
   }
 
@@ -2671,11 +2726,9 @@ async function endAndShowLeader(){
     }
 
     if (!me.sid) {
-      const classPrefix = ($('classPrefixBind')?.value || '').replace(/\D/g, '').slice(0, 3);
-      const seatNo = ($('seatNoBind')?.value || '').replace(/\D/g, '').slice(0, 2);
-      if (!/^\d{3}$/.test(classPrefix)) throw new Error('請輸入 3 碼班級，例如 301');
-      if (!/^\d{1,2}$/.test(seatNo) || Number(seatNo) <= 0) throw new Error('請輸入 1 到 2 碼座號，例如 30');
-      const resp = await API.bindStudent({ classPrefix, seatNo }, studentToken);
+      const sid = ($('classSeatBind')?.value || '').replace(/\D/g, '').slice(0, 5);
+      if (!/^\d{5}$/.test(sid)) throw new Error('請輸入班級座號 5 碼數字，例如 30130');
+      const resp = await API.bindStudent({ sid }, studentToken);
       applyStudentUser(resp?.data?.user || {});
     }
 
@@ -2719,8 +2772,7 @@ async function endAndShowLeader(){
   });
 
   $('teacherOpen') && ($('teacherOpen').onclick = () => { /* 預設超連結會導去 ./teacher.html */ });
-  $('classPrefixBind')?.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 3); });
-  $('seatNoBind')?.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 2); });
+  $('classSeatBind')?.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); });
 
   // 實體鍵盤
   addEventListener('keydown', e => {
@@ -2786,6 +2838,10 @@ async function endAndShowLeader(){
 
   // 初始化
   buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); updateStageChip(); setBest(); canDraw = true; applyViewportLayout(); resize(); updateKeyPositions(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
-  restoreStudentSession().then(() => setBest()).catch(() => {});
+  if (teacherDemoMode) {
+    enterTeacherDemoMode().catch(err => alert('示範模式啟動失敗：' + err.message));
+  } else {
+    restoreStudentSession().then(() => setBest()).catch(() => {});
+  }
   window.addEventListener('beforeunload', () => { stopClassroomPolling(); stopHeartbeat(); });
 });

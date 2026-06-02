@@ -393,8 +393,14 @@ app.get("/api/me", requireStudentAuth, async (req, res) => {
 
 app.post("/api/student/bind", requireStudentAuth, async (req, res) => {
   if (!requireDB(res)) return;
-  const classPrefix = String(req.body?.classPrefix || "").trim();
-  const seatNo = String(req.body?.seatNo || "").trim().padStart(2, "0");
+  const rawSid = String(req.body?.sid || "").replace(/\D/g, "");
+  const classPrefix = rawSid
+    ? rawSid.slice(0, 3)
+    : String(req.body?.classPrefix || "").trim();
+  const seatNo = rawSid
+    ? rawSid.slice(3, 5)
+    : String(req.body?.seatNo || "").trim().padStart(2, "0");
+  if (rawSid && !/^\d{5}$/.test(rawSid)) return res.status(400).json({ ok: false, error: "sid_invalid" });
   if (!/^\d{3}$/.test(classPrefix)) return res.status(400).json({ ok: false, error: "class_prefix_invalid" });
   if (!/^\d{2}$/.test(seatNo) || seatNo === "00") return res.status(400).json({ ok: false, error: "seat_no_invalid" });
 

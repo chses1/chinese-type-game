@@ -139,6 +139,14 @@ function studentName(row){
   return row.displayName || row.name || '—';
 }
 
+function studentClass(row){
+  return row.classPrefix || (row.sid ? String(row.sid).slice(0, 3) : '—');
+}
+
+function studentSeat(row){
+  return row.seatNo || (row.sid ? String(row.sid).slice(3) : '—');
+}
+
 function syncClassInputs(v){
   const value = (v || '').trim();
   if ($('classPrefix')) $('classPrefix').value = value;
@@ -244,13 +252,15 @@ function renderClassRankRows(rows){
   const body = $('teacherLbBody');
   if (!body) return;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="8">目前沒有排行榜資料</td></tr>';
+    body.innerHTML = '<tr><td colspan="10">目前沒有排行榜資料</td></tr>';
     return;
   }
   body.innerHTML = rows.map((r, i) => `
     <tr>
       <td>${i+1}</td>
       <td>${escapeHtml(r.sid)}</td>
+      <td>${escapeHtml(studentClass(r))}</td>
+      <td>${escapeHtml(studentSeat(r))}</td>
       <td>${escapeHtml(studentName(r))}</td>
       <td>${escapeHtml(r.email || '—')}</td>
       <td>${Number(r.best || 0)}</td>
@@ -471,6 +481,12 @@ async function teacherSignInWithGoogle(){
 function bindEvents(){
   document.querySelectorAll('.tabBtn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
   $('btnRefreshOverview')?.addEventListener('click', () => refreshAll({ forceClasses:true }).then(() => toast('已重新整理')).catch(err => alert(err.message)));
+  $('btnTeacherDemo')?.addEventListener('click', () => {
+    const token = getToken();
+    if (!token) return alert('請先登入教師後台');
+    const level = Math.max(1, Math.min(30, Number(($('demoLevel')?.value) || 1)));
+    location.href = `./index.html?demo=teacher&level=${encodeURIComponent(level)}`;
+  });
   $('btnLoadClasses')?.addEventListener('click', () => loadClasses().then(() => toast('已載入班級清單')).catch(err => alert(err.message)));
   $('btnShowAll')?.addEventListener('click', () => loadAllRank().catch(err => alert(err.message)));
   $('btnLoadClassRank')?.addEventListener('click', () => loadClassRank().catch(err => alert(err.message)));

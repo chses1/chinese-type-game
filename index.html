@@ -120,23 +120,18 @@
 <div id="login">
   <div id="card" class="loginCard">
     <h1 class="loginTitle">地球保衛戰</h1>
-    <p class="loginSubtitle">開始遊戲後，點擊下方注音鍵，擊落相同符號的隕石。</p>
     <div id="googleLoginBox">
       <button id="btnGoogleLogin" class="primary loginMainBtn" type="button">使用 Google 帳號登入</button>
       <div id="googleUserText" class="loginHint"></div>
     </div>
-    <div class="loginField">
-      <label for="classPrefixBind" class="loginLabel">首次登入請綁定班級與座號</label>
-      <div class="bindGrid">
-        <input id="classPrefixBind" class="loginInput" placeholder="班級，例如 301" inputmode="numeric" maxlength="3" />
-        <input id="seatNoBind" class="loginInput" placeholder="座號，例如 30" inputmode="numeric" maxlength="2" />
-      </div>
-      <div class="loginHint">綁定後會產生原本相容的 5 碼代號，例如 30130。</div>
+    <div id="studentBindPanel" class="loginField" hidden>
+      <label for="classSeatBind" class="loginLabel">首次登入請輸入班級座號 5 碼數字</label>
+      <input id="classSeatBind" class="loginInput" placeholder="例如：30130" inputmode="numeric" maxlength="5" />
+      <div class="loginHint">前三碼為班級，後兩碼為座號；排行榜會自動依班級分組。</div>
     </div>
 
-    <div class="rowBtns loginBtns">
+    <div id="studentStartPanel" class="rowBtns loginBtns" hidden>
       <button id="go" class="primary loginMainBtn">開始遊戲</button>
-      <a id="teacherOpen" class="tag loginSubBtn" href="./teacher.html">教師後台</a>
     </div>
   </div>
 </div>
