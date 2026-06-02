@@ -2592,7 +2592,7 @@ async function endAndShowLeader(){
   // 排行榜（教師按鈕在遊戲頁也可用）
   async function openLeader() {
     const closeBtn = $('btnCloseLeader');
-    if (closeBtn) closeBtn.textContent = '結束';
+    if (closeBtn) closeBtn.textContent = teacherDemoMode ? '返回教師平台' : '結束';
 
     const panel = $('leader');
     if (!panel) return;
@@ -2611,6 +2611,14 @@ async function endAndShowLeader(){
       p.style.display = 'none';
       p.setAttribute('hidden','');
     }
+  }
+
+  function returnToTeacherPlatform(){
+    closeLeader();
+    closeResult();
+    stopClassroomPolling();
+    stopHeartbeat();
+    location.href = './teacher.html';
   }
 
   function logoutToInitialScreen(){
@@ -2736,7 +2744,11 @@ async function endAndShowLeader(){
         $('classSeatBind')?.focus();
         throw new Error('請先輸入班級座號 5 碼數字，例如 30130');
       }
-      const resp = await API.bindStudent({ sid }, studentToken);
+      const resp = await API.bindStudent({
+        sid,
+        classPrefix: sid.slice(0, 3),
+        seatNo: sid.slice(3, 5)
+      }, studentToken);
       applyStudentUser(resp?.data?.user || {});
     }
 
@@ -2756,7 +2768,7 @@ async function endAndShowLeader(){
   });
   $('btnClassLeader')  && ($('btnClassLeader').onclick=async()=>{ leaderMode='class'; await renderLeader('class'); });
   $('btnGlobalLeader') && ($('btnGlobalLeader').onclick=async()=>{ leaderMode='global'; await renderLeader('global'); });
-  $('btnCloseLeader')  && ($('btnCloseLeader').onclick=logoutToInitialScreen);
+  $('btnCloseLeader')  && ($('btnCloseLeader').onclick=()=>{ teacherDemoMode ? returnToTeacherPlatform() : logoutToInitialScreen(); });
   $('btnRestartGame')  && ($('btnRestartGame').onclick=()=>{ closeLeader(); restart(); });
   $('btnStudentLogout') && ($('btnStudentLogout').onclick=logoutToInitialScreen);
 
