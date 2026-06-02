@@ -120,10 +120,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const imgReady = { normal:false, gold:false, ice:false, boss:false };
 
   const meteorImageCandidates = {
-    normal: ['meteor_normal.png', './meteor_normal.png', 'img/meteor_normal.png', './img/meteor_normal.png'],
-    gold:   ['meteor_gold.png', './meteor_gold.png', 'img/meteor_gold.png', './img/meteor_gold.png'],
-    ice:    ['meteor_ice.png', './meteor_ice.png', 'img/meteor_ice.png', './img/meteor_ice.png'],
-    boss:   ['meteor_boss.png', './meteor_boss.png', 'img/meteor_boss.png', './img/meteor_boss.png'],
+    normal: ['img/meteor_normal.png', './img/meteor_normal.png', 'meteor_normal.png', './meteor_normal.png'],
+    gold:   ['img/meteor_gold.png', './img/meteor_gold.png', 'meteor_gold.png', './meteor_gold.png'],
+    ice:    ['img/meteor_ice.png', './img/meteor_ice.png', 'meteor_ice.png', './meteor_ice.png'],
+    boss:   ['img/meteor_boss.png', './img/meteor_boss.png', 'meteor_boss.png', './meteor_boss.png'],
   };
 
   for (const [k,img] of Object.entries(meteorImgs)) {
@@ -2635,6 +2635,7 @@ async function endAndShowLeader(){
     if ($('googleUserText')) $('googleUserText').textContent = '';
     if ($('studentBindPanel')) $('studentBindPanel').hidden = true;
     if ($('studentStartPanel')) $('studentStartPanel').hidden = true;
+    if ($('btnStudentLogout')) $('btnStudentLogout').hidden = true;
     if ($('btnGoogleLogin')) $('btnGoogleLogin').style.display = '';
     if ($('login')) $('login').style.display = 'flex';
   }
@@ -2644,6 +2645,14 @@ async function endAndShowLeader(){
   async function loadClassRank(){ const p=$('classPrefix')?.value.trim(); if(!/^\d{3}$/.test(p)){ alert('請輸入正確的班級前三碼'); return; } const limit=Number(($('lbLimit')?.value)||20); const tb=$('teacherLbBody'); if(!tb) return; tb.innerHTML=""; try{ const resp=await API.leaderboard(limit,p); tb.innerHTML=resp.data.map((r,i)=>`<tr><td style="padding:8px 10px">${i+1}</td><td style="padding:8px 10px">${r.sid}</td><td style="padding:8px 10px">${r.best}</td></tr>`).join(''); }catch(e){ tb.innerHTML=`<tr><td colspan="3" style="padding:8px 10px">讀取失敗：${e.message}</td></tr>`; } }
   async function clearClass(){ const p=$('classPrefix')?.value.trim(); if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼'); return; } if(!confirm(`確認清除 ${p} 班全部紀錄（含學號）？`)) return; try{ await API.adminClearClass(p,teacherToken); toast && toast(`已清除 ${p} 班`); await loadClassRank(); }catch(e){ alert('清除失敗：'+e.message); } }
   async function clearAll(){ if(!confirm('確認清除全部學生紀錄（含學號）？')) return; try{ await API.adminClearAll(teacherToken); toast && toast('已清除全部學生紀錄'); await loadAllRank(); }catch(e){ alert('清除失敗：'+e.message); } }
+
+  function updateLoginPanels() {
+    const isSignedIn = !!(studentToken && (me.email || me.displayName || me.sid));
+    if ($('studentBindPanel')) $('studentBindPanel').hidden = !isSignedIn || !!me.sid;
+    if ($('studentStartPanel')) $('studentStartPanel').hidden = !isSignedIn;
+    if ($('btnStudentLogout')) $('btnStudentLogout').hidden = !isSignedIn;
+    if ($('btnGoogleLogin')) $('btnGoogleLogin').style.display = isSignedIn ? 'none' : '';
+  }
 
   function applyStudentUser(user = {}) {
     me = {
@@ -2659,10 +2668,8 @@ async function endAndShowLeader(){
       $('googleUserText').textContent = me.email ? `已登入：${me.displayName || me.email}` : '';
     }
     if ($('classSeatBind') && me.sid) $('classSeatBind').value = me.sid;
-    if ($('studentBindPanel')) $('studentBindPanel').hidden = !!me.sid;
-    if ($('studentStartPanel')) $('studentStartPanel').hidden = false;
-    if ($('btnGoogleLogin')) $('btnGoogleLogin').style.display = me.email ? 'none' : '';
     setUserChip();
+    updateLoginPanels();
   }
 
   function initFirebaseAuth(){
@@ -2700,8 +2707,6 @@ async function endAndShowLeader(){
     if (!studentToken) throw new Error('伺服器沒有回傳學生登入 session');
     setStudentToken(studentToken);
     applyStudentUser(resp?.data?.user || {});
-    if (!resp?.data?.user?.sid && $('studentBindPanel')) $('studentBindPanel').hidden = false;
-    if (!resp?.data?.user?.sid && $('studentStartPanel')) $('studentStartPanel').hidden = false;
     return resp?.data?.user || {};
   }
 
@@ -2727,7 +2732,10 @@ async function endAndShowLeader(){
 
     if (!me.sid) {
       const sid = ($('classSeatBind')?.value || '').replace(/\D/g, '').slice(0, 5);
-      if (!/^\d{5}$/.test(sid)) throw new Error('請輸入班級座號 5 碼數字，例如 30130');
+      if (!/^\d{5}$/.test(sid)) {
+        $('classSeatBind')?.focus();
+        throw new Error('請先輸入班級座號 5 碼數字，例如 30130');
+      }
       const resp = await API.bindStudent({ sid }, studentToken);
       applyStudentUser(resp?.data?.user || {});
     }
@@ -2750,6 +2758,7 @@ async function endAndShowLeader(){
   $('btnGlobalLeader') && ($('btnGlobalLeader').onclick=async()=>{ leaderMode='global'; await renderLeader('global'); });
   $('btnCloseLeader')  && ($('btnCloseLeader').onclick=logoutToInitialScreen);
   $('btnRestartGame')  && ($('btnRestartGame').onclick=()=>{ closeLeader(); restart(); });
+  $('btnStudentLogout') && ($('btnStudentLogout').onclick=logoutToInitialScreen);
 
   $('go') && ($('go').onclick = async () => {
     try {

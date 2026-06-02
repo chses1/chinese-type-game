@@ -448,6 +448,13 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
   margin-top:14px;
 }
 
+.loginLogoutBtn{
+  min-height:54px;
+  flex:0 0 118px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
 #teacherOpen,
 .loginSubBtn{
   min-height:54px;
