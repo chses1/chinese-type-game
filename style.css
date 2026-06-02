@@ -629,3 +629,19 @@ button.ghost{background:transparent;border:1px dashed rgba(255,255,255,.35)}
     padding:10px 10px;
   }
 }
+
+.bindGrid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+#googleUserText:empty{
+  display:none;
+}
+
+@media (max-width: 520px){
+  .bindGrid{
+    grid-template-columns:1fr;
+  }
+}

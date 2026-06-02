@@ -66,7 +66,7 @@ const adminLoginRateLimit = createRateLimiter({
 const heartbeatRateLimit = createRateLimiter({
   windowMs: 60 * 1000,
   max: 60,
-  keyFn: req => `heartbeat:${String(req.body?.sid || getClientIp(req))}`,
+  keyFn: req => `heartbeat:${String(req.header("x-student-session") || req.body?.sid || getClientIp(req))}`,
   message: "heartbeat_rate_limited"
 });
 
@@ -120,6 +120,9 @@ async function initMongo() {
     students = db.collection("students");
     classroomStates = db.collection("classroom_states");
     await students.createIndex({ sid: 1 }, { unique: true });
+    await students.createIndex({ googleSub: 1 }, { unique: true, sparse: true });
+    await students.createIndex({ email: 1 });
+    await students.createIndex({ classPrefix: 1, seatNo: 1 });
     await students.createIndex({ best: -1, updatedAt: -1 });
     await students.createIndex({ lastSeenAt: -1 });
     await students.createIndex({ sid: 1, lastSeenAt: -1 });
@@ -162,7 +165,276 @@ function requireDB(res) {
   return true;
 }
 
+// ====== Google 登入 / Session ======
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || "chinese-type-game";
+const SESSION_SECRET = process.env.SESSION_SECRET || "";
+const STUDENT_SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const studentSessions = new Map();
+let firebaseCertCache = { certs: null, expiresAt: 0 };
+
+function getTeacherEmailSet() {
+  return new Set(
+    String(process.env.TEACHER_EMAILS || "")
+      .split(",")
+      .map(email => email.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function createSessionToken(prefix = "sess") {
+  const salt = SESSION_SECRET || crypto.randomBytes(16).toString("hex");
+  return `${prefix}_${crypto.createHmac("sha256", salt).update(crypto.randomBytes(32)).digest("hex")}`;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of studentSessions.entries()) {
+    if (!session || session.expiresAt <= now) studentSessions.delete(token);
+  }
+}, 10 * 60 * 1000).unref?.();
+
+async function verifyGoogleIdToken(idToken) {
+  if (!GOOGLE_CLIENT_ID) {
+    const err = new Error("google_client_id_not_set");
+    err.status = 500;
+    throw err;
+  }
+  if (!idToken || typeof idToken !== "string") {
+    const err = new Error("missing_id_token");
+    err.status = 400;
+    throw err;
+  }
+
+  const url = "https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken);
+  const resp = await fetch(url, { headers: { "Accept": "application/json" } });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    const err = new Error("google_token_invalid");
+    err.status = 401;
+    throw err;
+  }
+  if (data.aud !== GOOGLE_CLIENT_ID || !data.sub || data.email_verified !== "true") {
+    const err = new Error("google_token_rejected");
+    err.status = 401;
+    throw err;
+  }
+
+  return {
+    googleSub: String(data.sub),
+    email: String(data.email || "").toLowerCase(),
+    displayName: String(data.name || data.email || ""),
+    picture: String(data.picture || "")
+  };
+}
+
+function base64UrlDecode(value) {
+  const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  return Buffer.from(padded, "base64");
+}
+
+function decodeJwtPart(value) {
+  return JSON.parse(base64UrlDecode(value).toString("utf8"));
+}
+
+async function getFirebaseCerts() {
+  const now = Date.now();
+  if (firebaseCertCache.certs && now < firebaseCertCache.expiresAt) return firebaseCertCache.certs;
+  const resp = await fetch("https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com");
+  const certs = await resp.json();
+  if (!resp.ok || !certs || typeof certs !== "object") {
+    const err = new Error("firebase_certs_unavailable");
+    err.status = 503;
+    throw err;
+  }
+  const maxAgeMatch = String(resp.headers.get("cache-control") || "").match(/max-age=(\d+)/);
+  const maxAgeMs = maxAgeMatch ? Number(maxAgeMatch[1]) * 1000 : 60 * 60 * 1000;
+  firebaseCertCache = { certs, expiresAt: now + maxAgeMs };
+  return certs;
+}
+
+async function verifyFirebaseIdToken(idToken) {
+  if (!FIREBASE_PROJECT_ID) {
+    const err = new Error("firebase_project_id_not_set");
+    err.status = 500;
+    throw err;
+  }
+  if (!idToken || typeof idToken !== "string") {
+    const err = new Error("missing_id_token");
+    err.status = 400;
+    throw err;
+  }
+
+  const parts = idToken.split(".");
+  if (parts.length !== 3) {
+    const err = new Error("firebase_token_malformed");
+    err.status = 401;
+    throw err;
+  }
+
+  const header = decodeJwtPart(parts[0]);
+  const payload = decodeJwtPart(parts[1]);
+  const certs = await getFirebaseCerts();
+  const cert = certs[header.kid];
+  if (!cert || header.alg !== "RS256") {
+    const err = new Error("firebase_token_unknown_key");
+    err.status = 401;
+    throw err;
+  }
+
+  const verifier = crypto.createVerify("RSA-SHA256");
+  verifier.update(`${parts[0]}.${parts[1]}`);
+  verifier.end();
+  const valid = verifier.verify(cert, base64UrlDecode(parts[2]));
+  const nowSec = Math.floor(Date.now() / 1000);
+  const issuer = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
+  if (!valid || payload.aud !== FIREBASE_PROJECT_ID || payload.iss !== issuer || !payload.sub || payload.exp <= nowSec || payload.iat > nowSec + 300 || payload.email_verified !== true) {
+    const err = new Error("firebase_token_rejected");
+    err.status = 401;
+    throw err;
+  }
+
+  return {
+    googleSub: String(payload.sub),
+    email: String(payload.email || "").toLowerCase(),
+    displayName: String(payload.name || payload.email || ""),
+    picture: String(payload.picture || "")
+  };
+}
+
+async function verifyLoginIdToken(idToken) {
+  try {
+    return await verifyFirebaseIdToken(idToken);
+  } catch (firebaseErr) {
+    if (!GOOGLE_CLIENT_ID) throw firebaseErr;
+    return verifyGoogleIdToken(idToken);
+  }
+}
+
+function publicStudent(doc, profile = null) {
+  const src = doc || {};
+  return {
+    sid: src.sid || null,
+    classPrefix: src.classPrefix || (src.sid ? String(src.sid).slice(0, 3) : ""),
+    seatNo: src.seatNo || (src.sid ? String(src.sid).slice(3, 5) : ""),
+    email: src.email || profile?.email || "",
+    displayName: src.displayName || profile?.displayName || "",
+    picture: src.picture || profile?.picture || "",
+    best: Number(src.best || 0),
+    bestLevel: Number(src.bestLevel || 0),
+    progressLevel: Number(src.progressLevel || src.bestLevel || 0),
+    bound: !!src.sid
+  };
+}
+
+function createStudentSession(profile, doc = null) {
+  const sessionToken = createSessionToken("stu");
+  studentSessions.set(sessionToken, {
+    profile,
+    sid: doc?.sid || null,
+    expiresAt: Date.now() + STUDENT_SESSION_TTL_MS
+  });
+  return sessionToken;
+}
+
+function getStudentSessionToken(req) {
+  return req.header("x-student-session") || req.query.studentSession || "";
+}
+
+async function requireStudentAuth(req, res, next) {
+  const sessionToken = getStudentSessionToken(req);
+  const session = studentSessions.get(sessionToken);
+  if (!session) return res.status(401).json({ ok: false, error: "student_unauthorized" });
+  if (session.expiresAt <= Date.now()) {
+    studentSessions.delete(sessionToken);
+    return res.status(401).json({ ok: false, error: "student_session_expired" });
+  }
+  session.expiresAt = Date.now() + STUDENT_SESSION_TTL_MS;
+  let doc = null;
+  if (students && session.profile?.googleSub) {
+    doc = await students.findOne(
+      { googleSub: session.profile.googleSub },
+      { projection: { _id: 0 } }
+    );
+    if (doc?.sid) session.sid = doc.sid;
+  }
+  req.studentSession = session;
+  req.student = publicStudent(doc, session.profile);
+  next();
+}
+
 // ====== 一般 API ======
+app.post("/api/auth/google", async (req, res) => {
+  if (!requireDB(res)) return;
+  try {
+    const profile = await verifyLoginIdToken(req.body?.idToken);
+    const now = new Date();
+    const doc = await students.findOne({ googleSub: profile.googleSub }, { projection: { _id: 0 } });
+    if (doc?.sid) {
+      await students.updateOne(
+        { googleSub: profile.googleSub },
+        { $set: { email: profile.email, displayName: profile.displayName, picture: profile.picture, lastLoginAt: now, updatedAt: now } }
+      );
+    }
+    const refreshed = doc?.sid
+      ? await students.findOne({ googleSub: profile.googleSub }, { projection: { _id: 0 } })
+      : null;
+    const sessionToken = createStudentSession(profile, refreshed);
+    res.json({ ok: true, data: { sessionToken, expiresInMs: STUDENT_SESSION_TTL_MS, user: publicStudent(refreshed, profile) } });
+  } catch (err) {
+    res.status(err.status || 500).json({ ok: false, error: err.message || "google_login_failed" });
+  }
+});
+
+app.get("/api/me", requireStudentAuth, async (req, res) => {
+  res.json({ ok: true, data: { user: req.student } });
+});
+
+app.post("/api/student/bind", requireStudentAuth, async (req, res) => {
+  if (!requireDB(res)) return;
+  const classPrefix = String(req.body?.classPrefix || "").trim();
+  const seatNo = String(req.body?.seatNo || "").trim().padStart(2, "0");
+  if (!/^\d{3}$/.test(classPrefix)) return res.status(400).json({ ok: false, error: "class_prefix_invalid" });
+  if (!/^\d{2}$/.test(seatNo) || seatNo === "00") return res.status(400).json({ ok: false, error: "seat_no_invalid" });
+
+  const sid = `${classPrefix}${seatNo}`;
+  const profile = req.studentSession.profile;
+  const now = new Date();
+  const current = await students.findOne({ googleSub: profile.googleSub });
+  if (current?.sid && current.sid !== sid) {
+    return res.status(409).json({ ok: false, error: "google_account_already_bound", sid: current.sid });
+  }
+
+  const sidOwner = await students.findOne({ sid });
+  if (sidOwner?.googleSub && sidOwner.googleSub !== profile.googleSub) {
+    return res.status(409).json({ ok: false, error: "sid_already_bound" });
+  }
+
+  await students.updateOne(
+    { sid },
+    {
+      $setOnInsert: { best: 0, bestLevel: 0, progressLevel: 1, createdAt: now },
+      $set: {
+        googleSub: profile.googleSub,
+        email: profile.email,
+        displayName: profile.displayName,
+        picture: profile.picture,
+        classPrefix,
+        seatNo,
+        name: profile.displayName,
+        lastLoginAt: now,
+        updatedAt: now
+      }
+    },
+    { upsert: true }
+  );
+  invalidateClassesCache();
+  const doc = await students.findOne({ sid }, { projection: { _id: 0 } });
+  req.studentSession.sid = sid;
+  res.json({ ok: true, data: { user: publicStudent(doc, profile) } });
+});
+
 app.post("/api/upsert-student", async (req, res) => {
   if (!requireDB(res)) return;
   const { sid, name = "" } = req.body || {};
@@ -178,9 +450,10 @@ app.post("/api/upsert-student", async (req, res) => {
   res.json({ ok: true, data: doc });
 });
 
-app.post("/api/update-best", async (req, res) => {
+app.post("/api/update-best", requireStudentAuth, async (req, res) => {
   if (!requireDB(res)) return;
-  const { sid, score, level = 0 } = req.body || {};
+  const sid = req.student.sid;
+  const { score, level = 0 } = req.body || {};
   if (!/^\d{5}$/.test(String(sid)) || typeof score !== "number") {
     return res.status(400).json({ ok: false, error: "bad_request" });
   }
@@ -201,7 +474,7 @@ app.post("/api/update-best", async (req, res) => {
 
   await students.updateOne(
     { sid: String(sid) },
-    { $set: { best: nextBest, bestLevel: nextBestLevel, updatedAt: new Date() } }
+    { $set: { best: nextBest, bestLevel: nextBestLevel, progressLevel: Math.max(numericLevel, Number(doc?.progressLevel || 0)), updatedAt: new Date() } }
   );
   invalidateClassesCache();
   res.json({ ok: true, data: { sid: String(sid), best: nextBest, bestLevel: nextBestLevel } });
@@ -216,16 +489,17 @@ app.get("/api/leaderboard", async (req, res) => {
   if (/^\d{3}$/.test(classPrefix)) filter.sid = new RegExp("^" + classPrefix);
 
   const list  = await students
-    .find(filter, { projection: { _id: 0, sid: 1, name: 1, best: 1, bestLevel: 1 } })
+    .find(filter, { projection: { _id: 0, sid: 1, name: 1, displayName: 1, email: 1, classPrefix: 1, seatNo: 1, best: 1, bestLevel: 1, progressLevel: 1, lastSeenAt: 1, lastLoginAt: 1, updatedAt: 1 } })
     .sort({ best: -1, updatedAt: -1 })
     .limit(limit)
     .toArray();
   res.json({ ok: true, data: list });
 });
 
-app.post("/api/student/heartbeat", heartbeatRateLimit, async (req, res) => {
+app.post("/api/student/heartbeat", heartbeatRateLimit, requireStudentAuth, async (req, res) => {
   if (!requireDB(res)) return;
-  const { sid, score = 0, status = "online", classroom = false } = req.body || {};
+  const sid = req.student.sid;
+  const { score = 0, status = "online", classroom = false } = req.body || {};
   if (!/^\d{5}$/.test(String(sid))) return res.status(400).json({ ok: false, error: "sid_invalid" });
   const now = new Date();
   await students.updateOne(
@@ -246,10 +520,11 @@ app.post("/api/student/heartbeat", heartbeatRateLimit, async (req, res) => {
   res.json({ ok: true, data: { sid: String(sid), lastSeenAt: now } });
 });
 
-app.get("/api/student/:sid", async (req, res) => {
+app.get("/api/student/:sid", requireStudentAuth, async (req, res) => {
   if (!requireDB(res)) return;
   const sid = req.params.sid;
   if (!/^\d{5}$/.test(sid)) return res.status(400).json({ ok: false, error: "sid_invalid" });
+  if (sid !== req.student.sid) return res.status(403).json({ ok: false, error: "student_forbidden" });
   const doc = await students.findOne({ sid }, { projection: { _id: 0, sid: 1, best: 1, bestLevel: 1 } });
   res.json({ ok: true, data: { sid, best: Number(doc?.best || 0), bestLevel: Number(doc?.bestLevel || 0) } });
 });
@@ -284,7 +559,7 @@ app.get("/api/admin/online-students", adminAuth, async (req, res) => {
 
   const list = await students
     .find(filter, {
-      projection: { _id: 0, sid: 1, best: 1, currentScore: 1, onlineStatus: 1, inClassroomMode: 1, lastSeenAt: 1, updatedAt: 1 }
+      projection: { _id: 0, sid: 1, name: 1, displayName: 1, email: 1, classPrefix: 1, seatNo: 1, best: 1, bestLevel: 1, progressLevel: 1, currentScore: 1, onlineStatus: 1, inClassroomMode: 1, lastSeenAt: 1, lastLoginAt: 1, updatedAt: 1 }
     })
     .sort({ sid: 1 })
     .limit(200)
@@ -303,7 +578,7 @@ app.get("/api/admin/live-leaderboard", adminAuth, async (req, res) => {
 
   const list = await students
     .find(filter, {
-      projection: { _id: 0, sid: 1, best: 1, currentScore: 1, onlineStatus: 1, inClassroomMode: 1, lastSeenAt: 1 }
+      projection: { _id: 0, sid: 1, name: 1, displayName: 1, email: 1, classPrefix: 1, seatNo: 1, best: 1, bestLevel: 1, progressLevel: 1, currentScore: 1, onlineStatus: 1, inClassroomMode: 1, lastSeenAt: 1, lastLoginAt: 1 }
     })
     .sort({ currentScore: -1, best: -1, sid: 1 })
     .limit(limit)
@@ -408,6 +683,23 @@ app.post("/api/admin/login", adminLoginRateLimit, (req, res) => {
 
   const sessionToken = createAdminSession();
   res.json({ ok: true, data: { sessionToken, expiresInMs: ADMIN_SESSION_TTL_MS } });
+});
+
+app.post("/api/admin/google-login", adminLoginRateLimit, async (req, res) => {
+  try {
+    const profile = await verifyLoginIdToken(req.body?.idToken);
+    const teacherEmails = getTeacherEmailSet();
+    if (!teacherEmails.size) {
+      return res.status(500).json({ ok: false, error: "teacher_emails_not_set" });
+    }
+    if (!teacherEmails.has(profile.email)) {
+      return res.status(403).json({ ok: false, error: "teacher_email_not_allowed" });
+    }
+    const sessionToken = createAdminSession();
+    res.json({ ok: true, data: { sessionToken, expiresInMs: ADMIN_SESSION_TTL_MS, teacher: profile } });
+  } catch (err) {
+    res.status(err.status || 500).json({ ok: false, error: err.message || "teacher_google_login_failed" });
+  }
 });
 
 // 清除某班（刪除 or 歸零）

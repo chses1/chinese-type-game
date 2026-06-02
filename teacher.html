@@ -142,11 +142,13 @@
   <div id="lock" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.66);z-index:60; padding:16px;">
     <div class="panel" style="width:min(460px,92vw); padding:22px; text-align:center;">
       <div style="font-size:2.2rem; margin-bottom:6px;">🔐</div>
-      <h2 style="margin:.2rem 0 1rem; font-size:1.6rem;">輸入教師密碼</h2>
-      <div class="muted" style="margin-bottom:12px;">解鎖後即可管理班級競賽、手動派送事件卡與任務卡。</div>
+      <h2 style="margin:.2rem 0 1rem; font-size:1.6rem;">教師 Google 登入</h2>
+      <div class="muted" style="margin-bottom:12px;">只有環境變數 TEACHER_EMAILS 內的老師 Email 可以進入後台。</div>
+      <button id="teacherGoogleLogin" class="primary" style="width:100%; margin-bottom:12px;">使用 Google 帳號進入</button>
+      <div class="muted" style="margin:4px 0 10px;">備援：若尚未啟用 Google 教師名單，可暫用原本教師密碼。</div>
       <input id="lockPass" type="password" placeholder="教師密碼" />
       <div style="display:flex;gap:8px;margin-top:12px; flex-wrap:wrap;">
-        <button id="lockEnter" class="primary" style="flex:1 1 180px;">解鎖進入</button>
+        <button id="lockEnter" class="ghost" style="flex:1 1 180px;">用密碼進入</button>
         <a href="/" class="ghost" style="flex:1 1 140px; text-decoration:none;">返回首頁</a>
       </div>
     </div>
@@ -314,8 +316,8 @@
 
         <div class="tableWrap" style="margin-top:14px; max-height:480px;">
           <table>
-            <thead><tr><th style="width:64px">#</th><th>學號</th><th style="width:120px">最佳</th><th style="width:120px">關卡</th><th style="width:120px">操作</th></tr></thead>
-            <tbody id="teacherLbBody"><tr><td colspan="4">尚未載入資料</td></tr></tbody>
+            <thead><tr><th style="width:64px">#</th><th>學號</th><th>姓名</th><th>Email</th><th style="width:120px">最佳</th><th style="width:120px">關卡</th><th style="width:150px">最後活動</th><th style="width:120px">操作</th></tr></thead>
+            <tbody id="teacherLbBody"><tr><td colspan="8">尚未載入資料</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -334,7 +336,9 @@
   </main>
 
   <div id="toast"></div>
-  <script src="config.js"></script>
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="teacher.js"></script>
 </body>
 </html>

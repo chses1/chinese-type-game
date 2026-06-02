@@ -29,17 +29,25 @@ async function jsonFetch(path, options = {}) {
   return res.json();
 }
 
+const STUDENT_TOKEN_KEY = 'student-session-token';
+function getStudentToken(){ return localStorage.getItem(STUDENT_TOKEN_KEY) || ''; }
+function setStudentToken(v){ if (v) localStorage.setItem(STUDENT_TOKEN_KEY, v); else localStorage.removeItem(STUDENT_TOKEN_KEY); }
+const studentAuthHeaders = token => token ? { 'x-student-session': token } : {};
+
 const API = {
+  googleLogin(idToken) { return jsonFetch(`${API_BASE}/auth/google`, { method:"POST", body:JSON.stringify({ idToken }) }); },
+  me(token) { return jsonFetch(`${API_BASE}/me`, { headers: studentAuthHeaders(token) }); },
+  bindStudent(payload, token) { return jsonFetch(`${API_BASE}/student/bind`, { method:"POST", headers: studentAuthHeaders(token), body:JSON.stringify(payload) }); },
   upsertStudent(payload) { return jsonFetch(`${API_BASE}/upsert-student`, { method:"POST", body:JSON.stringify(payload) }); },
-  updateBest(payload)    { return jsonFetch(`${API_BASE}/update-best`,     { method:"POST", body:JSON.stringify(payload) }); },
+  updateBest(payload, token)    { return jsonFetch(`${API_BASE}/update-best`,     { method:"POST", headers: studentAuthHeaders(token), body:JSON.stringify(payload) }); },
   leaderboard(limit=10, classPrefix=""){
     const qs = new URLSearchParams({ limit }); if (classPrefix) qs.set("classPrefix", classPrefix);
     return jsonFetch(`${API_BASE}/leaderboard?` + qs.toString());
   },
-  getStudent(sid)  { return jsonFetch(`${API_BASE}/student/${sid}`); },
+  getStudent(sid, token)  { return jsonFetch(`${API_BASE}/student/${sid}`, { headers: studentAuthHeaders(token) }); },
   getClasses()     { return jsonFetch(`${API_BASE}/classes`); },
   classroomState() { return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`); },
-  studentHeartbeat(payload){ return jsonFetch(`${API_BASE}/student/heartbeat`, { method:"POST", body:JSON.stringify(payload) }); },
+  studentHeartbeat(payload, token){ return jsonFetch(`${API_BASE}/student/heartbeat`, { method:"POST", headers: studentAuthHeaders(token), body:JSON.stringify(payload) }); },
 
 };
 
@@ -848,7 +856,9 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let slowUntil = 0;          // performance.now() 的時間戳
   const SLOW_MS = 5000;       // 慢動作持續時間（延長為 5 秒）
   const SLOW_FACTOR = 0.45;   // 速度倍率（0.45 = 變慢）
-  let me={sid:null,name:''};
+  let me={sid:null,name:'',email:'',displayName:'',classPrefix:'',seatNo:'',bound:false};
+  let studentToken = getStudentToken();
+  let firebaseAuth = null;
   let leaderMode = 'class';
   let teacherToken="";
 
@@ -869,10 +879,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let classroomSyncInFlight = false;
 
   async function sendHeartbeat(status='online'){
-    if (!me.sid || heartbeatInFlight) return;
+    if (!me.sid || !studentToken || heartbeatInFlight) return;
     heartbeatInFlight = true;
     try {
-      await API.studentHeartbeat({ sid: me.sid, score, status, classroom: classroomMode });
+      await API.studentHeartbeat({ score, status, classroom: classroomMode }, studentToken);
     } catch (e) {
       console.warn('heartbeat fail', e);
     } finally {
@@ -895,7 +905,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     }
   }
 
-  const setUserChip=()=>$('userChip') && ($('userChip').textContent=me.sid?`${me.sid}`:'未登入');
+  const setUserChip=()=>$('userChip') && ($('userChip').textContent=me.sid?`${me.sid}${me.displayName ? '｜' + me.displayName : ''}`:'未登入');
   const setScore=()=>$('score') && ($('score').textContent=score);
   const setTime =()=>$('time') && ($('time').textContent=timeLeft);
   const setLives=()=>{ const el=$('lives'); if(el) el.textContent = '❤️'.repeat(Math.max(0,lives)) + '🤍'.repeat(Math.max(0,MAX_LIVES-lives)); };
@@ -973,7 +983,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     updateStageChip();
     closeResult();
     if (finalVictory?.active) finishFinalVictorySequence(true);
-    if (!keepLogin) me = { sid:null, name:'' };
+    if (!keepLogin) me = { sid:null, name:'', email:'', displayName:'', classPrefix:'', seatNo:'', bound:false };
     updatePauseButton();
   }
 
@@ -1127,10 +1137,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   async function setBest(){
     const b = $('best');
     if (!b || !me.sid) return;
-    try { const r = await API.getStudent(me.sid); if (r.ok) b.textContent = r.data.best; } catch{}
+    try { const r = await API.getStudent(me.sid, studentToken); if (r.ok) b.textContent = r.data.best; } catch{}
   }
   async function submitBest(sid, score, levelReached = level){
-    try { await API.updateBest({ sid, score, level: levelReached }); } catch(e){ console.warn('submitBest fail', e); }
+    try { await API.updateBest({ score, level: levelReached }, studentToken); } catch(e){ console.warn('submitBest fail', e); }
   }
 // 🔑 記錄每個注音鍵在 canvas 中對應的位置
 const keyPositions = {};
@@ -2581,8 +2591,13 @@ async function endAndShowLeader(){
     hideClassroomOverlay();
     setModeChip('模式：自由練習', false);
     resetWholeGame({ keepLogin:false });
+    studentToken = '';
+    setStudentToken('');
+    firebaseAuth?.signOut?.().catch(() => {});
     setUserChip();
-    if ($('sid')) $('sid').value = '';
+    if ($('classPrefixBind')) $('classPrefixBind').value = '';
+    if ($('seatNoBind')) $('seatNoBind').value = '';
+    if ($('googleUserText')) $('googleUserText').textContent = '';
     if ($('login')) $('login').style.display = 'flex';
   }
 
@@ -2592,18 +2607,104 @@ async function endAndShowLeader(){
   async function clearClass(){ const p=$('classPrefix')?.value.trim(); if(!/^\d{3}$/.test(p)){ alert('請先輸入班級前三碼'); return; } if(!confirm(`確認清除 ${p} 班全部紀錄（含學號）？`)) return; try{ await API.adminClearClass(p,teacherToken); toast && toast(`已清除 ${p} 班`); await loadClassRank(); }catch(e){ alert('清除失敗：'+e.message); } }
   async function clearAll(){ if(!confirm('確認清除全部學生紀錄（含學號）？')) return; try{ await API.adminClearAll(teacherToken); toast && toast('已清除全部學生紀錄'); await loadAllRank(); }catch(e){ alert('清除失敗：'+e.message); } }
 
+  function applyStudentUser(user = {}) {
+    me = {
+      sid: user.sid || null,
+      name: user.displayName || user.name || '',
+      email: user.email || '',
+      displayName: user.displayName || user.name || '',
+      classPrefix: user.classPrefix || '',
+      seatNo: user.seatNo || '',
+      bound: !!user.bound
+    };
+    if ($('googleUserText')) {
+      $('googleUserText').textContent = me.email ? `已登入：${me.displayName || me.email}` : '';
+    }
+    if ($('classPrefixBind') && me.classPrefix) $('classPrefixBind').value = me.classPrefix;
+    if ($('seatNoBind') && me.seatNo) $('seatNoBind').value = me.seatNo;
+    setUserChip();
+  }
+
+  function initFirebaseAuth(){
+    if (firebaseAuth) return firebaseAuth;
+    const firebaseConfig = window.APP_CONFIG?.FIREBASE_CONFIG;
+    if (!firebaseConfig || !window.firebase?.initializeApp || !window.firebase?.auth) {
+      throw new Error('Firebase 尚未設定，請確認 config.js 的 FIREBASE_CONFIG 與 Firebase scripts');
+    }
+    if (!window.firebase.apps?.length) window.firebase.initializeApp(firebaseConfig);
+    firebaseAuth = window.firebase.auth();
+    return firebaseAuth;
+  }
+
+  async function signInWithGoogle(){
+    const auth = initFirebaseAuth();
+    const provider = new window.firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await auth.signInWithPopup(provider);
+    const idToken = await result.user.getIdToken(true);
+    const resp = await API.googleLogin(idToken);
+    studentToken = resp?.data?.sessionToken || '';
+    if (!studentToken) throw new Error('伺服器沒有回傳學生登入 session');
+    setStudentToken(studentToken);
+    applyStudentUser(resp?.data?.user || {});
+    return resp?.data?.user || {};
+  }
+
+  async function restoreStudentSession(){
+    if (!studentToken) return false;
+    try {
+      const resp = await API.me(studentToken);
+      applyStudentUser(resp?.data?.user || {});
+      return !!me.sid;
+    } catch (e) {
+      studentToken = '';
+      setStudentToken('');
+      return false;
+    }
+  }
+
+  async function ensureStudentReady(){
+    if (!studentToken) {
+      await signInWithGoogle();
+    } else if (!me.sid) {
+      await restoreStudentSession();
+    }
+
+    if (!me.sid) {
+      const classPrefix = ($('classPrefixBind')?.value || '').replace(/\D/g, '').slice(0, 3);
+      const seatNo = ($('seatNoBind')?.value || '').replace(/\D/g, '').slice(0, 2);
+      if (!/^\d{3}$/.test(classPrefix)) throw new Error('請輸入 3 碼班級，例如 301');
+      if (!/^\d{1,2}$/.test(seatNo) || Number(seatNo) <= 0) throw new Error('請輸入 1 到 2 碼座號，例如 30');
+      const resp = await API.bindStudent({ classPrefix, seatNo }, studentToken);
+      applyStudentUser(resp?.data?.user || {});
+    }
+
+    if (!me.sid) throw new Error('尚未完成班級座號綁定');
+    return me;
+  }
+
   // 綁定 UI（存在才綁）
   // 舊版按鈕綁定已移除，避免和目前介面殘留結構混用
+  $('btnGoogleLogin') && ($('btnGoogleLogin').onclick = async () => {
+    try {
+      await signInWithGoogle();
+      toast && toast(me.sid ? '已登入' : '已登入，請綁定班級座號');
+    } catch (e) {
+      alert('Google 登入失敗：' + e.message);
+    }
+  });
   $('btnClassLeader')  && ($('btnClassLeader').onclick=async()=>{ leaderMode='class'; await renderLeader('class'); });
   $('btnGlobalLeader') && ($('btnGlobalLeader').onclick=async()=>{ leaderMode='global'; await renderLeader('global'); });
   $('btnCloseLeader')  && ($('btnCloseLeader').onclick=logoutToInitialScreen);
   $('btnRestartGame')  && ($('btnRestartGame').onclick=()=>{ closeLeader(); restart(); });
 
   $('go') && ($('go').onclick = async () => {
-    let sid = $('sid').value.trim().replace(/\D/g,'');
-    if (!/^\d{5}$/.test(sid)) { alert('請輸入5位數學號'); return; }
-    me.sid = sid; me.name = '';
-    try { await API.upsertStudent({ sid }); } catch (e) { alert('登入失敗：' + e.message); return; }
+    try {
+      await ensureStudentReady();
+    } catch (e) {
+      alert('登入失敗：' + e.message);
+      return;
+    }
     setUserChip(); await setBest();
     if ($('login')) $('login').style.display='none';
     resetWholeGame();
@@ -2618,6 +2719,8 @@ async function endAndShowLeader(){
   });
 
   $('teacherOpen') && ($('teacherOpen').onclick = () => { /* 預設超連結會導去 ./teacher.html */ });
+  $('classPrefixBind')?.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 3); });
+  $('seatNoBind')?.addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 2); });
 
   // 實體鍵盤
   addEventListener('keydown', e => {
@@ -2683,5 +2786,6 @@ async function endAndShowLeader(){
 
   // 初始化
   buildKeyboard(); applyKbdPref(); setUserChip(); setScore(); setTime(); setLives(); updateStageChip(); setBest(); canDraw = true; applyViewportLayout(); resize(); updateKeyPositions(); draw(); hideClassroomOverlay(); setModeChip('模式：自由練習', false); updatePauseButton(); requestAnimationFrame(step);
+  restoreStudentSession().then(() => setBest()).catch(() => {});
   window.addEventListener('beforeunload', () => { stopClassroomPolling(); stopHeartbeat(); });
 });

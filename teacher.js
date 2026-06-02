@@ -66,6 +66,7 @@ async function jsonFetch(url, opts = {}) {
 const authHeaders = token => token ? { 'x-admin-session': token } : {};
 const API = {
   adminLogin(password){ return jsonFetch(`${API_BASE}/admin/login`, { method:'POST', body: JSON.stringify({ password }) }); },
+  adminGoogleLogin(idToken){ return jsonFetch(`${API_BASE}/admin/google-login`, { method:'POST', body: JSON.stringify({ idToken }) }); },
   getClasses(forceRefresh = false){ return jsonFetch(`${API_BASE}/classes${forceRefresh ? '?refresh=1' : ''}`); },
   leaderboard(limit = 500, classPrefix = '') {
     const qs = new URLSearchParams({ limit });
@@ -128,6 +129,14 @@ function formatAgo(ts){
   if (diff < 1) return '剛剛';
   if (diff < 60) return `${diff} 秒前`;
   return `${Math.floor(diff / 60)} 分前`;
+}
+
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+function studentName(row){
+  return row.displayName || row.name || '—';
 }
 
 function syncClassInputs(v){
@@ -235,16 +244,19 @@ function renderClassRankRows(rows){
   const body = $('teacherLbBody');
   if (!body) return;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="5">目前沒有排行榜資料</td></tr>';
+    body.innerHTML = '<tr><td colspan="8">目前沒有排行榜資料</td></tr>';
     return;
   }
   body.innerHTML = rows.map((r, i) => `
     <tr>
       <td>${i+1}</td>
-      <td>${r.sid}</td>
+      <td>${escapeHtml(r.sid)}</td>
+      <td>${escapeHtml(studentName(r))}</td>
+      <td>${escapeHtml(r.email || '—')}</td>
       <td>${Number(r.best || 0)}</td>
       <td>${Number(r.bestLevel || 0) > 0 ? `第 ${Number(r.bestLevel)} 關` : '—'}</td>
-      <td><button class="ghost btnDeleteStudent" data-sid="${r.sid}">刪除</button></td>
+      <td>${formatAgo(r.lastSeenAt || r.lastLoginAt || r.updatedAt)}</td>
+      <td><button class="ghost btnDeleteStudent" data-sid="${escapeHtml(r.sid)}">刪除</button></td>
     </tr>`).join('');
 
   body.querySelectorAll('.btnDeleteStudent').forEach(btn => {
@@ -353,7 +365,7 @@ async function refreshAll({ forceClasses = false } = {}){
 
 function ensureTeacherReady(){
   const token = getToken();
-  if (!token) throw new Error('請先輸入教師密碼');
+  if (!token) throw new Error('請先登入教師後台');
   const prefix = getSelectedClassPrefix();
   if (!/^\d{3}$/.test(prefix)) throw new Error('請先輸入班級前三碼');
   return { token, prefix };
@@ -361,13 +373,13 @@ function ensureTeacherReady(){
 
 async function onOpen(){ const { token, prefix } = ensureTeacherReady(); await API.classroomOpen(prefix, token); toast(`已開啟 ${prefix} 班競賽`); await refreshAll(); }
 async function onStart(){ const { token, prefix } = ensureTeacherReady(); const sec = Number(($('ccCountdown')?.value) || 3); await API.classroomStart(prefix, sec, token); toast('全班開始倒數'); await refreshAll(); }
-async function onPause(){ const token = getToken(); if (!token) throw new Error('請先輸入教師密碼'); await API.classroomPause(token); toast('已全班暫停'); await refreshAll(); }
-async function onRestart(){ const token = getToken(); if (!token) throw new Error('請先輸入教師密碼'); if (!confirm('確定讓全班重新開始嗎？目前分數會從 0 重新計算。')) return; const sec = Number(($('ccCountdown')?.value) || 3); await API.classroomRestart(sec, token); toast('全班重新倒數'); await refreshAll(); }
-async function onClose(){ const token = getToken(); if (!token) throw new Error('請先輸入教師密碼'); if (!confirm('確定結束班級競賽嗎？學生會回到自由練習模式。')) return; await API.classroomClose(token); toast('已結束競賽'); await refreshAll(); }
+async function onPause(){ const token = getToken(); if (!token) throw new Error('請先登入教師後台'); await API.classroomPause(token); toast('已全班暫停'); await refreshAll(); }
+async function onRestart(){ const token = getToken(); if (!token) throw new Error('請先登入教師後台'); if (!confirm('確定讓全班重新開始嗎？目前分數會從 0 重新計算。')) return; const sec = Number(($('ccCountdown')?.value) || 3); await API.classroomRestart(sec, token); toast('全班重新倒數'); await refreshAll(); }
+async function onClose(){ const token = getToken(); if (!token) throw new Error('請先登入教師後台'); if (!confirm('確定結束班級競賽嗎？學生會回到自由練習模式。')) return; await API.classroomClose(token); toast('已結束競賽'); await refreshAll(); }
 
 async function onTriggerEvent(eventId){
   const token = getToken();
-  if (!token) throw new Error('請先輸入教師密碼');
+  if (!token) throw new Error('請先登入教師後台');
   if (!(state.classroom?.enabled)) throw new Error('請先開啟班級競賽');
   await API.classroomTriggerEvent(eventId, token);
   state.eventCooldownUntil = Date.now() + ACTION_COOLDOWN_MS;
@@ -378,7 +390,7 @@ async function onTriggerEvent(eventId){
 
 async function onAssignMission(missionId){
   const token = getToken();
-  if (!token) throw new Error('請先輸入教師密碼');
+  if (!token) throw new Error('請先登入教師後台');
   if (!(state.classroom?.enabled)) throw new Error('請先開啟班級競賽');
   await API.classroomAssignMission(missionId, token);
   state.missionCooldownUntil = Date.now() + ACTION_COOLDOWN_MS;
@@ -390,7 +402,7 @@ async function onAssignMission(missionId){
 async function clearClass(){
   const token = getToken();
   const prefix = ($('classPrefix')?.value || '').trim();
-  if (!token) return alert('請先輸入教師密碼');
+  if (!token) return alert('請先登入教師後台');
   if (!/^\d{3}$/.test(prefix)) return alert('請先輸入班級前三碼');
   if (!confirm(`確認清除 ${prefix} 班全部紀錄（含學號）？`)) return;
   await API.adminClearClass(prefix, token);
@@ -401,7 +413,7 @@ async function clearClass(){
 
 async function clearAll(){
   const token = getToken();
-  if (!token) return alert('請先輸入教師密碼');
+  if (!token) return alert('請先登入教師後台');
   if (!confirm('確認清除全部學生紀錄（含學號）？')) return;
   await API.adminClearAll(token);
   toast('已清除全部學生紀錄');
@@ -412,7 +424,7 @@ async function clearAll(){
 
 async function deleteStudent(sid){
   const token = getToken();
-  if (!token) return alert('請先輸入教師密碼');
+  if (!token) return alert('請先登入教師後台');
   if (!/^\d{5}$/.test(String(sid || '').trim())) return alert('學生學號格式錯誤');
   if (!confirm(`確認刪除學生 ${sid} 的成績資料？此動作無法復原。`)) return;
   await API.adminDeleteStudent(String(sid).trim(), token);
@@ -425,6 +437,35 @@ async function deleteStudent(sid){
 function startPolling(){
   clearInterval(state.pollTimer);
   state.pollTimer = setInterval(() => refreshAll().catch(err => console.warn(err)), POLL_INTERVAL_MS);
+}
+
+let firebaseAuth = null;
+
+function initFirebaseAuth(){
+  if (firebaseAuth) return firebaseAuth;
+  const firebaseConfig = window.APP_CONFIG?.FIREBASE_CONFIG;
+  if (!firebaseConfig || !window.firebase?.initializeApp || !window.firebase?.auth) {
+    throw new Error('Firebase 尚未設定，請確認 config.js 的 FIREBASE_CONFIG 與 Firebase scripts');
+  }
+  if (!window.firebase.apps?.length) window.firebase.initializeApp(firebaseConfig);
+  firebaseAuth = window.firebase.auth();
+  return firebaseAuth;
+}
+
+async function teacherSignInWithGoogle(){
+  const auth = initFirebaseAuth();
+  const provider = new window.firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  const result = await auth.signInWithPopup(provider);
+  const idToken = await result.user.getIdToken(true);
+  const resp = await API.adminGoogleLogin(idToken);
+  const sessionToken = resp?.data?.sessionToken || '';
+  if (!sessionToken) throw new Error('伺服器沒有回傳教師 session');
+  setToken(sessionToken);
+  hideLock();
+  await refreshAll({ forceClasses:true });
+  startPolling();
+  toast('已用 Google 登入');
 }
 
 function bindEvents(){
@@ -450,6 +491,13 @@ function bindEvents(){
   $('ccClassPrefix')?.addEventListener('input', e => { const v = e.target.value.replace(/\D/g, '').slice(0,3); e.target.value = v; if ($('classPrefix')) $('classPrefix').value = v; });
   document.querySelectorAll('.eventBtn').forEach(btn => btn.addEventListener('click', () => onTriggerEvent(btn.dataset.event).catch(err => alert(err.message))));
   document.querySelectorAll('.missionBtn').forEach(btn => btn.addEventListener('click', () => onAssignMission(btn.dataset.mission).catch(err => alert(err.message))));
+
+  $('teacherGoogleLogin')?.addEventListener('click', () => {
+    teacherSignInWithGoogle().catch(err => {
+      alert('Google 教師登入失敗：' + err.message);
+      showLock();
+    });
+  });
 
   $('lockEnter')?.addEventListener('click', async () => {
     const password = ($('lockPass')?.value || '').trim();
