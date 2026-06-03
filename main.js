@@ -18,8 +18,8 @@ const API_BASE = (() => {
 async function jsonFetch(path, options = {}) {
   const res = await fetch(path, {
     cache: "no-store",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) }
   });
   if (!res.ok) {
     let detail = null;
