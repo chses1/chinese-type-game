@@ -2701,7 +2701,10 @@ async function endAndShowLeader(){
       bound: !!user.bound
     };
     if ($('googleUserText')) {
-      $('googleUserText').textContent = me.email ? `已登入：${me.displayName || me.email}` : '';
+      const playerName = me.displayName || me.email;
+      $('googleUserText').textContent = playerName
+        ? `歡迎${playerName}加入地球防衛軍。按下鍵盤上的注音，就可以擊落宇宙中來襲的隕石。你有三次接關的機會，好好把握，拿下最佳成績吧！`
+        : '';
     }
     if ($('classSeatBind') && me.sid) $('classSeatBind').value = me.sid;
     setUserChip();

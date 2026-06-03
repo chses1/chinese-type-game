@@ -414,6 +414,7 @@ input,button,select{
 .loginHint{
   margin-top:8px;
   font-size:13px;
+  line-height:1.65;
   color:rgba(238,245,255,.68);
 }
 
