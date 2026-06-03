@@ -73,7 +73,7 @@ const heartbeatRateLimit = createRateLimiter({
 const classroomStateRateLimit = createRateLimiter({
   windowMs: 60 * 1000,
   max: 90,
-  keyFn: req => `classroom-state:${getClientIp(req)}`,
+  keyFn: req => `classroom-state:${String(req.header("x-student-session") || getClientIp(req))}`,
   message: "classroom_state_rate_limited"
 });
 
@@ -102,6 +102,7 @@ const dbName   = process.env.DB_NAME || "zhuyin";
 
 let client, db, students, classroomStates;
 const CLASSES_CACHE_TTL_MS = 30000;
+const ONLINE_CUTOFF_MS = 45000;
 let classesCache = { data: null, expiresAt: 0 };
 
 function invalidateClassesCache() {
@@ -565,7 +566,7 @@ app.get("/api/classes", async (req, res) => {
 app.get("/api/admin/online-students", adminAuth, async (req, res) => {
   if (!requireDB(res)) return;
   const classPrefix = String(req.query.classPrefix || "").trim();
-  const cutoff = new Date(Date.now() - 15000);
+  const cutoff = new Date(Date.now() - ONLINE_CUTOFF_MS);
   const filter = { lastSeenAt: { $gte: cutoff } };
   if (/^\d{3}$/.test(classPrefix)) filter.sid = new RegExp("^" + classPrefix);
 
@@ -583,7 +584,7 @@ app.get("/api/admin/online-students", adminAuth, async (req, res) => {
 app.get("/api/admin/live-leaderboard", adminAuth, async (req, res) => {
   if (!requireDB(res)) return;
   const classPrefix = String(req.query.classPrefix || "").trim();
-  const cutoff = new Date(Date.now() - 15000);
+  const cutoff = new Date(Date.now() - ONLINE_CUTOFF_MS);
   const limit = Math.min(Number(req.query.limit || 20), 100);
   const filter = { lastSeenAt: { $gte: cutoff } };
   if (/^\d{3}$/.test(classPrefix)) filter.sid = new RegExp("^" + classPrefix);

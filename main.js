@@ -67,7 +67,7 @@ const API = {
   },
   getStudent(sid, token)  { return jsonFetch(`${API_BASE}/student/${sid}`, { headers: studentAuthHeaders(token) }); },
   getClasses()     { return jsonFetch(`${API_BASE}/classes`); },
-  classroomState() { return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`); },
+  classroomState(token = '') { return jsonFetch(`${API_BASE}/classroom/state?t=${Date.now()}`, { headers: studentAuthHeaders(token) }); },
   studentHeartbeat(payload, token){ return jsonFetch(`${API_BASE}/student/heartbeat`, { method:"POST", headers: studentAuthHeaders(token), body:JSON.stringify(payload) }); },
 
 };
@@ -900,6 +900,10 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
   let heartbeatTimer = null;
   let heartbeatInFlight = false;
   let classroomSyncInFlight = false;
+  const HEARTBEAT_INTERVAL_MS = 12000;
+  const CLASSROOM_IDLE_POLL_MS = 8000;
+  const CLASSROOM_ACTIVE_POLL_MS = 2000;
+  let classroomNextPollMs = CLASSROOM_IDLE_POLL_MS;
 
   async function sendHeartbeat(status='online'){
     if (teacherDemoMode || !me.sid || !studentToken || heartbeatInFlight) return;
@@ -917,7 +921,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     stopHeartbeat();
     heartbeatTimer = setInterval(() => {
       sendHeartbeat(running ? 'playing' : 'online');
-    }, 4000);
+    }, HEARTBEAT_INTERVAL_MS);
     sendHeartbeat(running ? 'playing' : 'online');
   }
 
@@ -1046,7 +1050,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   function stopClassroomPolling(){
     if (classroomPollTimer) {
-      clearInterval(classroomPollTimer);
+      clearTimeout(classroomPollTimer);
       classroomPollTimer = null;
     }
   }
@@ -1055,10 +1059,11 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
     if (!me.sid || classroomSyncInFlight) return;
     classroomSyncInFlight = true;
     try {
-      const resp = await API.classroomState();
+      const resp = await API.classroomState(studentToken);
       const s = resp.data || {};
       const myClass = String(me.sid).slice(0, 3);
       const isMine = !!(s.enabled && s.classPrefix === myClass);
+      classroomNextPollMs = isMine ? CLASSROOM_ACTIVE_POLL_MS : CLASSROOM_IDLE_POLL_MS;
 
       if (!isMine) {
         const wasClassroomMode = classroomMode;
@@ -1140,6 +1145,7 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
       updatePauseButton();
     } catch (e) {
       console.warn('classroom sync fail', e);
+      classroomNextPollMs = CLASSROOM_IDLE_POLL_MS;
     } finally {
       classroomSyncInFlight = false;
     }
@@ -1147,8 +1153,13 @@ const keyClass = ch => SHENGMU.has(ch) ? 'shengmu' : (MEDIAL.has(ch)?'medial':(T
 
   function startClassroomPolling(){
     stopClassroomPolling();
-    classroomPollTimer = setInterval(syncClassroomState, 2000);
-    syncClassroomState();
+    const poll = async () => {
+      await syncClassroomState();
+      if (classroomPollTimer) {
+        classroomPollTimer = setTimeout(poll, classroomNextPollMs);
+      }
+    };
+    classroomPollTimer = setTimeout(poll, 0);
   }
 
   function enterFreePracticeMode(){

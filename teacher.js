@@ -16,8 +16,8 @@ const API_BASE = (() => {
 const $ = id => document.getElementById(id);
 const TOKEN_KEY = 'teacher-session-token';
 const ACTION_COOLDOWN_MS = 8000;
-const POLL_INTERVAL_MS = 5000;
-const CLASS_LIST_REFRESH_MS = 30000;
+const POLL_INTERVAL_MS = 10000;
+const CLASS_LIST_REFRESH_MS = 60000;
 
 const state = {
   classroom: null,
@@ -139,14 +139,6 @@ function studentName(row){
   return row.displayName || row.name || '—';
 }
 
-function studentClass(row){
-  return row.classPrefix || (row.sid ? String(row.sid).slice(0, 3) : '—');
-}
-
-function studentSeat(row){
-  return row.seatNo || (row.sid ? String(row.sid).slice(3) : '—');
-}
-
 function syncClassInputs(v){
   const value = (v || '').trim();
   if ($('classPrefix')) $('classPrefix').value = value;
@@ -252,26 +244,17 @@ function renderClassRankRows(rows){
   const body = $('teacherLbBody');
   if (!body) return;
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="10">目前沒有排行榜資料</td></tr>';
+    body.innerHTML = '<tr><td colspan="5">目前沒有排行榜資料</td></tr>';
     return;
   }
   body.innerHTML = rows.map((r, i) => `
     <tr>
       <td>${i+1}</td>
       <td>${escapeHtml(r.sid)}</td>
-      <td>${escapeHtml(studentClass(r))}</td>
-      <td>${escapeHtml(studentSeat(r))}</td>
       <td>${escapeHtml(studentName(r))}</td>
-      <td>${escapeHtml(r.email || '—')}</td>
       <td>${Number(r.best || 0)}</td>
       <td>${Number(r.bestLevel || 0) > 0 ? `第 ${Number(r.bestLevel)} 關` : '—'}</td>
-      <td>${formatAgo(r.lastSeenAt || r.lastLoginAt || r.updatedAt)}</td>
-      <td><button class="ghost btnDeleteStudent" data-sid="${escapeHtml(r.sid)}">刪除</button></td>
     </tr>`).join('');
-
-  body.querySelectorAll('.btnDeleteStudent').forEach(btn => {
-    btn.addEventListener('click', () => deleteStudent(btn.dataset.sid).catch(err => alert(err.message)));
-  });
 }
 
 function renderClassChips(classes = []){
