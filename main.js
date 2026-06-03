@@ -22,11 +22,28 @@ async function jsonFetch(path, options = {}) {
     ...options
   });
   if (!res.ok) {
-    let detail = "";
-    try { detail = JSON.stringify(await res.json()); } catch {}
-    throw new Error(`HTTP ${res.status} ${res.statusText} ${detail}`);
+    let detail = null;
+    try { detail = await res.json(); } catch {}
+    const error = new Error(`HTTP ${res.status} ${res.statusText}${detail ? ` ${JSON.stringify(detail)}` : ""}`);
+    error.status = res.status;
+    error.detail = detail;
+    error.code = detail?.error || "";
+    throw error;
   }
   return res.json();
+}
+
+function friendlyApiError(err) {
+  const messages = {
+    class_prefix_invalid: '班級座號格式不正確，請輸入 5 碼數字，例如 30130。',
+    sid_invalid: '班級座號格式不正確，請輸入 5 碼數字，例如 30130。',
+    seat_no_invalid: '座號格式不正確，後兩碼需為 01 到 99。',
+    google_account_already_bound: '這個 Google 帳號已經綁定其他班級座號。',
+    sid_already_bound: '這個班級座號已經綁定其他 Google 帳號。',
+    student_unauthorized: '登入狀態已失效，請重新登入。',
+    student_session_expired: '登入狀態已過期，請重新登入。'
+  };
+  return messages[err?.code] || err?.message || String(err);
 }
 
 const STUDENT_TOKEN_KEY = 'student-session-token';
@@ -2776,7 +2793,7 @@ async function endAndShowLeader(){
     try {
       await ensureStudentReady();
     } catch (e) {
-      alert('登入失敗：' + e.message);
+      alert('登入失敗：' + friendlyApiError(e));
       return;
     }
     setUserChip(); await setBest();

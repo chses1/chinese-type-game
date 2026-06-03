@@ -393,13 +393,19 @@ app.get("/api/me", requireStudentAuth, async (req, res) => {
 
 app.post("/api/student/bind", requireStudentAuth, async (req, res) => {
   if (!requireDB(res)) return;
-  const rawSid = String(req.body?.sid || "").replace(/\D/g, "");
-  const classPrefix = rawSid
-    ? rawSid.slice(0, 3)
-    : String(req.body?.classPrefix || "").trim();
-  const seatNo = rawSid
-    ? rawSid.slice(3, 5)
-    : String(req.body?.seatNo || "").trim().padStart(2, "0");
+  const digits = value => String(value || "").replace(/\D/g, "");
+  const body = req.body || {};
+  let rawSid = digits(body.sid || body.studentId || body.studentNo || body.classSeat || body.classSeatBind);
+  let rawClassPrefix = digits(body.classPrefix || body.class || body.classId);
+  let rawSeatNo = digits(body.seatNo || body.seat || body.number);
+
+  if (!rawSid && rawClassPrefix.length === 5 && !rawSeatNo) {
+    rawSid = rawClassPrefix;
+    rawClassPrefix = "";
+  }
+
+  const classPrefix = rawSid ? rawSid.slice(0, 3) : rawClassPrefix.slice(0, 3);
+  const seatNo = rawSid ? rawSid.slice(3, 5) : rawSeatNo.padStart(2, "0");
   if (rawSid && !/^\d{5}$/.test(rawSid)) return res.status(400).json({ ok: false, error: "sid_invalid" });
   if (!/^\d{3}$/.test(classPrefix)) return res.status(400).json({ ok: false, error: "class_prefix_invalid" });
   if (!/^\d{2}$/.test(seatNo) || seatNo === "00") return res.status(400).json({ ok: false, error: "seat_no_invalid" });
